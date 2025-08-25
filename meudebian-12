@@ -1,0 +1,256 @@
+#!/bin/bash
+
+# ===================================================================================
+#
+#   SCRIPT DE PÓS-INSTALAÇÃO E GERENCIAMENTO DE APLICATIVOS PARA DEBIAN 12
+#
+#   Descrição: Este script automatiza a configuração inicial de um sistema Debian,
+#              incluindo a instalação de pacotes base, habilitação de repositórios
+#              e a instalação de aplicativos gerenciada por arquivos CSV.
+#
+#   Autor: Gemini
+#   Versão: 1.0
+#   Data: 2025-08-23
+#
+# ===================================================================================
+
+# --- VARIÁVEIS DE COR ---
+VERDE='\033[0;32m'
+AMARELO='\033[1;33m'
+VERMELHO='\033[0;31m'
+NC='\033[0m' # Sem Cor
+
+# --- VARIÁVEIS GLOBAIS ---
+ARQUITETURA=""
+
+# ===================================================================================
+# --- FUNÇÕES AUXILIARES ---
+# ===================================================================================
+
+# Função para verificar se o script está sendo executado como root
+verificar_root() {
+    echo -e "${AMARELO}Verificando permissões de superusuário...${NC}"
+    if [[ "$(id -u)" -ne 0 ]]; then
+        echo -e "${VERMELHO}ERRO: Este script precisa ser executado como root.${NC}"
+        echo "Use: sudo ./setup_debian.sh"
+        exit 1
+    fi
+    echo -e "${VERDE}Verificação de root concluída com sucesso.${NC}\n"
+}
+
+# Função para verificar a conexão com a internet
+verificar_internet() {
+    echo -e "${AMARELO}Verificando conexão com a internet...${NC}"
+    if ! ping -c 1 8.8.8.8 &> /dev/null; then
+        echo -e "${VERMELHO}ERRO: Não foi possível conectar à internet. Verifique sua conexão e tente novamente.${NC}"
+        exit 1
+    fi
+    echo -e "${VERDE}Conexão com a internet funcionando.${NC}\n"
+}
+
+# Função para detectar a arquitetura do sistema
+detectar_arquitetura() {
+    echo -e "${AMARELO}Detectando a arquitetura do sistema...${NC}"
+    ARQUITETURA=$(dpkg --print-architecture)
+    if [[ -z "$ARQUITETURA" ]]; then
+        echo -e "${VERMELHO}ERRO: Não foi possível determinar a arquitetura do sistema.${NC}"
+        exit 1
+    fi
+    echo -e "${VERDE}Arquitetura detectada: ${ARQUITETURA}${NC}\n"
+}
+
+# Função para instalar pacotes base
+instalar_dependencias_base() {
+    echo -e "${AMARELO}Atualizando lista de pacotes e instalando dependências base...${NC}"
+    apt-get update
+    apt-get install -y \
+        curl \
+        ca-certificates \
+        gnupg \
+        lsb-release \
+        wget \
+        gpg \
+        apt-transport-https
+    echo -e "${VERDE}Dependências base instaladas com sucesso.${NC}\n"
+}
+
+# Função para habilitar repositórios contrib e non-free
+habilitar_repositorios_extras() {
+    echo -e "${AMARELO}Habilitando repositórios 'contrib' e 'non-free'...${NC}"
+    # Faz um backup do sources.list original
+    cp /etc/apt/sources.list /etc/apt/sources.list.bak
+    # Adiciona contrib e non-free às linhas existentes
+    sed -i 's/main/main contrib non-free/g' /etc/apt/sources.list
+    echo -e "${AMARELO}Atualizando a lista de pacotes após adicionar novos repositórios...${NC}"
+    apt-get update
+    echo -e "${VERDE}Repositórios extras habilitados e lista de pacotes atualizada.${NC}\n"
+}
+
+# Função para criar os arquivos CSV de exemplo
+criar_arquivos_csv() {
+    echo -e "${AMARELO}Criando arquivos CSV de exemplo para gerenciamento de aplicativos...${NC}"
+
+    # Arquivo para APT
+    cat << EOF > apt_apps.csv
+nome_do_aplicativo,nome_do_instalador,descricao
+VLC,vlc,"Reprodutor de mídia open-source e multiplataforma"
+GIMP,gimp,"Editor de imagens avançado, alternativa ao Photoshop"
+Flameshot,flameshot,"Ferramenta de captura de tela poderosa e fácil de usar"
+EOF
+
+    # Arquivo para pacotes .DEB
+    # Nota: A URL pode variar com a arquitetura
+    cat << EOF > deb_apps.csv
+nome_do_aplicativo,url_do_pacote,descricao
+Google Chrome,https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb,"Navegador de internet do Google (somente para amd64)"
+EOF
+
+    # Arquivo para Flatpak
+    cat << EOF > flatpak_apps.csv
+nome_do_aplicativo,id_do_flatpak,descricao
+Spotify,com.spotify.Client,"Serviço de streaming de música"
+Discord,com.discordapp.Discord,"Plataforma de comunicação por voz, vídeo e texto"
+EOF
+
+    # Arquivo para AppImage
+    cat << EOF > appimage_apps.csv
+nome_do_aplicativo,url_do_appimage,descricao
+Kdenlive,https://download.kde.org/stable/kdenlive/24.05/kdenlive-24.05.2-x86_64.AppImage,"Editor de vídeo não-linear profissional"
+EOF
+
+    echo -e "${VERDE}Arquivos CSV criados com sucesso: apt_apps.csv, deb_apps.csv, flatpak_apps.csv, appimage_apps.csv${NC}\n"
+}
+
+# ===================================================================================
+# --- FUNÇÕES DE INSTALAÇÃO ---
+# ===================================================================================
+
+instalar_via_apt() {
+    local a_csv_file="apt_apps.csv"
+    if [ ! -f "$a_csv_file" ]; then
+        echo -e "${AMARELO}Arquivo ${a_csv_file} não encontrado. Pulando instalações via APT.${NC}"
+        return
+    fi
+
+    echo -e "${AMARELO}--- INICIANDO INSTALAÇÕES VIA APT ---${NC}"
+    tail -n +2 "$a_csv_file" | while IFS=, read -r app_name installer_name description; do
+        echo -e "Instalando ${app_name} (${description})..."
+        apt-get install -y "$installer_name"
+        echo -e "${VERDE}${app_name} instalado com sucesso.${NC}"
+    done
+    echo -e "${VERDE}--- INSTALAÇÕES VIA APT CONCLUÍDAS ---${NC}\n"
+}
+
+instalar_via_deb() {
+    local d_csv_file="deb_apps.csv"
+    if [ ! -f "$d_csv_file" ]; then
+        echo -e "${AMARELO}Arquivo ${d_csv_file} não encontrado. Pulando instalações via .deb.${NC}"
+        return
+    fi
+    
+    echo -e "${AMARELO}--- INICIANDO INSTALAÇÕES VIA PACOTES .DEB ---${NC}"
+    local temp_deb="/tmp/temp_package.deb"
+    tail -n +2 "$d_csv_file" | while IFS=, read -r app_name url description; do
+        echo -e "Instalando ${app_name} (${description})..."
+        
+        # Adiciona verificação de arquitetura para o exemplo do Chrome
+        if [[ "$app_name" == "Google Chrome" && "$ARQUITETURA" != "amd64" ]]; then
+            echo -e "${AMARELO}AVISO: Google Chrome está disponível apenas para a arquitetura amd64. Pulando instalação.${NC}"
+            continue
+        fi
+
+        wget -O "$temp_deb" "$url"
+        if [ $? -eq 0 ]; then
+            apt-get install -y "$temp_deb"
+            rm "$temp_deb"
+            echo -e "${VERDE}${app_name} instalado com sucesso.${NC}"
+        else
+            echo -e "${VERMELHO}ERRO: Falha ao baixar o pacote para ${app_name}.${NC}"
+        fi
+    done
+    echo -e "${VERDE}--- INSTALAÇÕES VIA .DEB CONCLUÍDAS ---${NC}\n"
+}
+
+instalar_via_flatpak() {
+    local f_csv_file="flatpak_apps.csv"
+    if [ ! -f "$f_csv_file" ]; then
+        echo -e "${AMARELO}Arquivo ${f_csv_file} não encontrado. Pulando instalações via Flatpak.${NC}"
+        return
+    fi
+
+    echo -e "${AMARELO}--- CONFIGURANDO E INICIANDO INSTALAÇÕES VIA FLATPAK ---${NC}"
+    # Verifica se o flatpak está instalado
+    if ! command -v flatpak &> /dev/null; then
+        echo "Flatpak não encontrado. Instalando..."
+        apt-get install -y flatpak
+    fi
+    # Adiciona o repositório Flathub
+    flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+    
+    tail -n +2 "$f_csv_file" | while IFS=, read -r app_name flatpak_id description; do
+        echo -e "Instalando ${app_name} (${description})..."
+        flatpak install -y flathub "$flatpak_id"
+        echo -e "${VERDE}${app_name} instalado com sucesso.${NC}"
+    done
+    echo -e "${VERDE}--- INSTALAÇÕES VIA FLATPAK CONCLUÍDAS ---${NC}\n"
+}
+
+instalar_via_appimage() {
+    local i_csv_file="appimage_apps.csv"
+    if [ ! -f "$i_csv_file" ]; then
+        echo -e "${AMARELO}Arquivo ${i_csv_file} não encontrado. Pulando instalações via AppImage.${NC}"
+        return
+    fi
+
+    echo -e "${AMARELO}--- INICIANDO DOWNLOADS DE APPIMAGES ---${NC}"
+    local appimage_dir="/opt/AppImages"
+    mkdir -p "$appimage_dir"
+
+    tail -n +2 "$i_csv_file" | while IFS=, read -r app_name url description; do
+        local file_name="${app_name}.AppImage"
+        local destination="${appimage_dir}/${file_name}"
+        echo -e "Baixando ${app_name} (${description})..."
+        wget -O "$destination" "$url"
+        if [ $? -eq 0 ]; then
+            chmod +x "$destination"
+            echo -e "${VERDE}${app_name} baixado e tornado executável em ${destination}${NC}"
+        else
+            echo -e "${VERMELHO}ERRO: Falha ao baixar o AppImage para ${app_name}.${NC}"
+        fi
+    done
+    echo -e "${VERDE}--- DOWNLOADS DE APPIMAGES CONCLUÍDOS ---${NC}\n"
+}
+
+
+# ===================================================================================
+# --- FUNÇÃO PRINCIPAL ---
+# ===================================================================================
+main() {
+    clear
+    echo -e "${VERDE}====================================================${NC}"
+    echo -e "${VERDE}  Iniciando Script de Configuração para Debian 12  ${NC}"
+    echo -e "${VERDE}====================================================${NC}\n"
+
+    # Etapas de verificação e preparação
+    verificar_root
+    verificar_internet
+    detectar_arquitetura
+    instalar_dependencias_base
+    habilitar_repositorios_extras
+    criar_arquivos_csv
+
+    # Etapas de instalação
+    instalar_via_apt
+    instalar_via_deb
+    instalar_via_flatpak
+    instalar_via_appimage
+
+    echo -e "${VERDE}====================================================${NC}"
+    echo -e "${VERDE}   Script concluído com sucesso!                  ${NC}"
+    echo -e "${VERDE}====================================================${NC}"
+    echo -e "Verifique o log acima para eventuais erros."
+    echo -e "Pode ser necessário reiniciar o sistema para que todas as alterações do Flatpak entrem em vigor."
+}
+
+# --- PONTO DE ENTRADA DO SCRIPT ---
+main
