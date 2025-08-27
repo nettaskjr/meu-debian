@@ -2,13 +2,13 @@
 
 # ===================================================================================
 #
-#   SCRIPT DE PÓS-INSTALAÇÃO E GERENCIAMENTO DE APLICATIVOS PARA DEBIAN 12
+#   SCRIPT DE PÓS-INSTALAÇÃO E GERENCIAMENTO DE APLICATIVOS PARA DEBIAN
 #
 #   Descrição: Este script automatiza a configuração inicial de um sistema Debian,
 #              incluindo a instalação de pacotes base, habilitação de repositórios
 #              e a instalação de aplicativos gerenciada por arquivos CSV.
 #
-#   Autor: Gemini
+#   Autor: netTask and Geminin
 #   Versão: 1.0
 #   Data: 2025-08-23
 #
@@ -86,40 +86,6 @@ habilitar_repositorios_extras() {
     echo -e "${VERDE}Repositórios extras habilitados e lista de pacotes atualizada.${NC}\n"
 }
 
-# Função para criar os arquivos CSV de exemplo
-criar_arquivos_csv() {
-    echo -e "${AMARELO}Criando arquivos CSV de exemplo para gerenciamento de aplicativos...${NC}"
-
-    # Arquivo para APT
-    cat << EOF > apt_apps.csv
-nome_do_aplicativo,nome_do_instalador,descricao
-VLC,vlc,"Reprodutor de mídia open-source e multiplataforma"
-GIMP,gimp,"Editor de imagens avançado, alternativa ao Photoshop"
-Flameshot,flameshot,"Ferramenta de captura de tela poderosa e fácil de usar"
-EOF
-
-    # Arquivo para pacotes .DEB
-    # Nota: A URL pode variar com a arquitetura
-    cat << EOF > deb_apps.csv
-nome_do_aplicativo,url_do_pacote,descricao
-Google Chrome,https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb,"Navegador de internet do Google (somente para amd64)"
-EOF
-
-    # Arquivo para Flatpak
-    cat << EOF > flatpak_apps.csv
-nome_do_aplicativo,id_do_flatpak,descricao
-Spotify,com.spotify.Client,"Serviço de streaming de música"
-Discord,com.discordapp.Discord,"Plataforma de comunicação por voz, vídeo e texto"
-EOF
-
-    # Arquivo para AppImage
-    cat << EOF > appimage_apps.csv
-nome_do_aplicativo,url_do_appimage,descricao
-Kdenlive,https://download.kde.org/stable/kdenlive/24.05/kdenlive-24.05.2-x86_64.AppImage,"Editor de vídeo não-linear profissional"
-EOF
-
-    echo -e "${VERDE}Arquivos CSV criados com sucesso: apt_apps.csv, deb_apps.csv, flatpak_apps.csv, appimage_apps.csv${NC}\n"
-}
 
 # ===================================================================================
 # --- FUNÇÕES DE INSTALAÇÃO ---
@@ -237,7 +203,6 @@ main() {
     detectar_arquitetura
     instalar_dependencias_base
     habilitar_repositorios_extras
-    criar_arquivos_csv
 
     # Etapas de instalação
     instalar_via_apt
