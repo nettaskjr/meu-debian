@@ -51,7 +51,7 @@ main() {
     echo -e "${VERDE}====================================================${NC}\n"
 
     # Etapas de verificação e preparação
-    criar_arquivo
+    criar_arquivo_csv
 
     echo -e "${VERDE}====================================================${NC}"
     echo -e "${VERDE}   Script concluído com sucesso!                    ${NC}"
