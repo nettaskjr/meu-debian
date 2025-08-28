@@ -1,2 +1,4 @@
 nome_do_aplicativo,url_do_pacote,descricao
 Google Chrome,https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb,"Navegador de internet do Google (somente para amd64)"
+Insync,https://cdn.insynchq.com/builds/linux/3.9.6.60027/insync_3.9.6.60027-bookworm_amd64.deb,"Cliente de sincronização do Google Drive e OneDrive"
+Visual Studio Code,https://vscode.download.prss.microsoft.com/dbazure/download/stable/6f17636121051a53c88d3e605c491d22af2ba755/code_1.103.2-1755709794_amd64.deb,"Editor de código-fonte leve e poderoso da Microsoft"

@@ -4,9 +4,9 @@
 #
 #   SCRIPT DE PÓS-INSTALAÇÃO E GERENCIAMENTO DE APLICATIVOS PARA DEBIAN
 #
-#   Descrição: Este script automatiza a configuração inicial de um sistema Debian,
-#              incluindo a instalação de pacotes base, habilitação de repositórios
-#              e a instalação de aplicativos gerenciada por arquivos CSV.
+#   Descrição: Este script  automatiza a configuração inicial de um sistema Debian,
+#              habilitação de repositórios instalação de aplicativos gerenciada por
+#              arquivos CSV.
 #
 #   Autor: netTask and Geminin
 #   Versão: 1.0
@@ -60,18 +60,11 @@ detectar_arquitetura() {
 }
 
 # Função para instalar pacotes base
-instalar_dependencias_base() {
-    echo -e "${AMARELO}Atualizando lista de pacotes e instalando dependências base...${NC}"
+instalar_atualiacoes() {
+    echo -e "${AMARELO}Atualizando lista de pacotes...${NC}"
     apt-get update
-    apt-get install -y \
-        curl \
-        ca-certificates \
-        gnupg \
-        lsb-release \
-        wget \
-        gpg \
-        apt-transport-https
-    echo -e "${VERDE}Dependências base instaladas com sucesso.${NC}\n"
+    apt-get dist-upgrade -y
+    echo -e "${VERDE}Atualização realiazada com sucesso...${NC}\n"
 }
 
 # Função para habilitar repositórios contrib e non-free
@@ -194,14 +187,14 @@ instalar_via_appimage() {
 main() {
     clear
     echo -e "${VERDE}====================================================${NC}"
-    echo -e "${VERDE}  Iniciando Script de Configuração para Debian 12  ${NC}"
+    echo -e "${VERDE}  Iniciando Script de Configuração para Debian      ${NC}"
     echo -e "${VERDE}====================================================${NC}\n"
 
     # Etapas de verificação e preparação
     verificar_root
     verificar_internet
     detectar_arquitetura
-    instalar_dependencias_base
+    instalar_atualiacoes
     habilitar_repositorios_extras
 
     # Etapas de instalação
@@ -211,7 +204,7 @@ main() {
     instalar_via_appimage
 
     echo -e "${VERDE}====================================================${NC}"
-    echo -e "${VERDE}   Script concluído com sucesso!                  ${NC}"
+    echo -e "${VERDE}   Script concluído com sucesso!                    ${NC}"
     echo -e "${VERDE}====================================================${NC}"
     echo -e "Verifique o log acima para eventuais erros."
     echo -e "Pode ser necessário reiniciar o sistema para que todas as alterações do Flatpak entrem em vigor."
