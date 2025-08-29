@@ -1,3 +1,5 @@
 nome_do_aplicativo,id_do_flatpak,descricao
 Spotify,com.spotify.Client,"Serviço de streaming de música"
 Discord,com.discordapp.Discord,"Plataforma de comunicação por voz, vídeo e texto"
+Lutis,net.lutris.Lutris,"Plataforma de jogos para Linux"
+Brave,com.brave.Browser,"Navegador web focado em privacidade"
