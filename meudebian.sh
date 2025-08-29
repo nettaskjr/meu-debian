@@ -95,7 +95,7 @@ instalar_via_apt() {
     # Usar substituição de processo (< <(...)) e verificar a variável (|| [[ -n ... ]])
     # para garantir que a última linha do CSV seja lida, mesmo se não tiver uma quebra de linha no final.
     while IFS=, read -r app_name installer_name description || [[ -n "$app_name" ]]; do
-        echo -e "${VERDE}Instalando ${app_name} (${description})..."
+        echo -e "${VERDE}Instalando ${app_name} (${description})...${NC}"
         apt-get install -y "$installer_name"
         echo -e "${VERDE}${app_name} instalado com sucesso.${NC}"
     done < <(tail -n +2 "$a_csv_file")
@@ -112,7 +112,7 @@ instalar_via_deb() {
     echo -e "${AMARELO}--- INICIANDO INSTALAÇÕES VIA PACOTES .DEB ---${NC}"
     local temp_deb="/tmp/temp_package.deb"
     while IFS=, read -r app_name url description || [[ -n "$app_name" ]]; do
-        echo -e "${VERDE}Instalando ${app_name} (${description})..."
+        echo -e "${VERDE}Instalando ${app_name} (${description})...${NC}"
         
         # Adiciona verificação de arquitetura para o exemplo do Chrome
         if [[ "$app_name" == "Google Chrome" && "$ARQUITETURA" != "amd64" ]]; then
@@ -153,7 +153,7 @@ instalar_via_flatpak() {
     flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
     
     while IFS=, read -r app_name flatpak_id description || [[ -n "$app_name" ]]; do
-        echo -e "${VERDE}Instalando ${app_name} (${description})..."
+        echo -e "${VERDE}Instalando ${app_name} (${description})...${NC}"
         flatpak install -y flathub "$flatpak_id"
         echo -e "${VERDE}${app_name} instalado com sucesso.${NC}"
     done < <(tail -n +2 "$f_csv_file")
@@ -174,7 +174,7 @@ instalar_via_appimage() {
     while IFS=, read -r app_name url description || [[ -n "$app_name" ]]; do
         local file_name="${app_name}.AppImage"
         local destination="${appimage_dir}/${file_name}"
-        echo -e "Baixando ${app_name} (${description})..."
+        echo -e "${VERDE}Baixando ${app_name} (${description})...${NC}"
         wget -O "$destination" "$url"
         if [ $? -eq 0 ]; then
             chmod +x "$destination"
