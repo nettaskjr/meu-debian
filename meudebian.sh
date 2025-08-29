@@ -129,6 +129,10 @@ instalar_via_deb() {
             echo -e "${VERMELHO}ERRO: Falha ao baixar o pacote para ${app_name}.${NC}"
         fi
     done < <(tail -n +2 "$d_csv_file")
+    
+    # atualiza o sistema após instalações via .deb
+    instalar_atualiacoes
+    
     echo -e "${VERDE}--- INSTALAÇÕES VIA .DEB CONCLUÍDAS ---${NC}\n"
 }
 
@@ -196,14 +200,14 @@ main() {
     verificar_root
     verificar_internet
     detectar_arquitetura
-    instalar_atualiacoes
     habilitar_repositorios_extras
+    instalar_atualiacoes
 
     # Etapas de instalação
-    instalar_via_apt
     instalar_via_deb
     instalar_via_flatpak
     instalar_via_appimage
+    instalar_via_apt
 
     echo -e "${VERDE}====================================================${NC}"
     echo -e "${VERDE}   Script concluído com sucesso!                    ${NC}"
