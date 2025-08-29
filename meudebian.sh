@@ -92,11 +92,13 @@ instalar_via_apt() {
     fi
 
     echo -e "${AMARELO}--- INICIANDO INSTALAÇÕES VIA APT ---${NC}"
-    tail -n +2 "$a_csv_file" | while IFS=, read -r app_name installer_name description; do
+    # Usar substituição de processo (< <(...)) e verificar a variável (|| [[ -n ... ]])
+    # para garantir que a última linha do CSV seja lida, mesmo se não tiver uma quebra de linha no final.
+    while IFS=, read -r app_name installer_name description || [[ -n "$app_name" ]]; do
         echo -e "Instalando ${app_name} (${description})..."
         apt-get install -y "$installer_name"
         echo -e "${VERDE}${app_name} instalado com sucesso.${NC}"
-    done
+    done < <(tail -n +2 "$a_csv_file")
     echo -e "${VERDE}--- INSTALAÇÕES VIA APT CONCLUÍDAS ---${NC}\n"
 }
 
@@ -109,7 +111,7 @@ instalar_via_deb() {
     
     echo -e "${AMARELO}--- INICIANDO INSTALAÇÕES VIA PACOTES .DEB ---${NC}"
     local temp_deb="/tmp/temp_package.deb"
-    tail -n +2 "$d_csv_file" | while IFS=, read -r app_name url description; do
+    while IFS=, read -r app_name url description || [[ -n "$app_name" ]]; do
         echo -e "Instalando ${app_name} (${description})..."
         
         # Adiciona verificação de arquitetura para o exemplo do Chrome
@@ -126,7 +128,7 @@ instalar_via_deb() {
         else
             echo -e "${VERMELHO}ERRO: Falha ao baixar o pacote para ${app_name}.${NC}"
         fi
-    done
+    done < <(tail -n +2 "$d_csv_file")
     echo -e "${VERDE}--- INSTALAÇÕES VIA .DEB CONCLUÍDAS ---${NC}\n"
 }
 
@@ -146,11 +148,11 @@ instalar_via_flatpak() {
     # Adiciona o repositório Flathub
     flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
     
-    tail -n +2 "$f_csv_file" | while IFS=, read -r app_name flatpak_id description; do
+    while IFS=, read -r app_name flatpak_id description || [[ -n "$app_name" ]]; do
         echo -e "Instalando ${app_name} (${description})..."
         flatpak install -y flathub "$flatpak_id"
         echo -e "${VERDE}${app_name} instalado com sucesso.${NC}"
-    done
+    done < <(tail -n +2 "$f_csv_file")
     echo -e "${VERDE}--- INSTALAÇÕES VIA FLATPAK CONCLUÍDAS ---${NC}\n"
 }
 
@@ -165,7 +167,7 @@ instalar_via_appimage() {
     local appimage_dir="/opt/AppImages"
     mkdir -p "$appimage_dir"
 
-    tail -n +2 "$i_csv_file" | while IFS=, read -r app_name url description; do
+    while IFS=, read -r app_name url description || [[ -n "$app_name" ]]; do
         local file_name="${app_name}.AppImage"
         local destination="${appimage_dir}/${file_name}"
         echo -e "Baixando ${app_name} (${description})..."
@@ -176,7 +178,7 @@ instalar_via_appimage() {
         else
             echo -e "${VERMELHO}ERRO: Falha ao baixar o AppImage para ${app_name}.${NC}"
         fi
-    done
+    done < <(tail -n +2 "$i_csv_file")
     echo -e "${VERDE}--- DOWNLOADS DE APPIMAGES CONCLUÍDOS ---${NC}\n"
 }
 
