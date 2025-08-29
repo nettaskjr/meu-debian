@@ -59,7 +59,7 @@ detectar_arquitetura() {
     echo -e "${VERDE}Arquitetura detectada: ${ARQUITETURA}${NC}\n"
 }
 
-# Função para instalar pacotes base
+# Função para instalar as atualizações do sistema
 instalar_atualiacoes() {
     echo -e "${AMARELO}Atualizando lista de pacotes...${NC}"
     apt-get update
@@ -95,7 +95,7 @@ instalar_via_apt() {
     # Usar substituição de processo (< <(...)) e verificar a variável (|| [[ -n ... ]])
     # para garantir que a última linha do CSV seja lida, mesmo se não tiver uma quebra de linha no final.
     while IFS=, read -r app_name installer_name description || [[ -n "$app_name" ]]; do
-        echo -e "Instalando ${app_name} (${description})..."
+        echo -e "${VERDE}Instalando ${app_name} (${description})..."
         apt-get install -y "$installer_name"
         echo -e "${VERDE}${app_name} instalado com sucesso.${NC}"
     done < <(tail -n +2 "$a_csv_file")
@@ -112,7 +112,7 @@ instalar_via_deb() {
     echo -e "${AMARELO}--- INICIANDO INSTALAÇÕES VIA PACOTES .DEB ---${NC}"
     local temp_deb="/tmp/temp_package.deb"
     while IFS=, read -r app_name url description || [[ -n "$app_name" ]]; do
-        echo -e "Instalando ${app_name} (${description})..."
+        echo -e "${VERDE}Instalando ${app_name} (${description})..."
         
         # Adiciona verificação de arquitetura para o exemplo do Chrome
         if [[ "$app_name" == "Google Chrome" && "$ARQUITETURA" != "amd64" ]]; then
@@ -153,7 +153,7 @@ instalar_via_flatpak() {
     flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
     
     while IFS=, read -r app_name flatpak_id description || [[ -n "$app_name" ]]; do
-        echo -e "Instalando ${app_name} (${description})..."
+        echo -e "${VERDE}Instalando ${app_name} (${description})..."
         flatpak install -y flathub "$flatpak_id"
         echo -e "${VERDE}${app_name} instalado com sucesso.${NC}"
     done < <(tail -n +2 "$f_csv_file")
