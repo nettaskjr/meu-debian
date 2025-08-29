@@ -96,7 +96,7 @@ instalar_via_apt() {
     # para garantir que a última linha do CSV seja lida, mesmo se não tiver uma quebra de linha no final.
     while IFS=, read -r app_name installer_name description || [[ -n "$app_name" ]]; do
         echo -e "${VERDE}Instalando ${app_name} (${description})...${NC}"
-        apt-get install -y "$installer_name"
+        apt-get install -y "$installer_name" < /dev/null
         echo -e "${VERDE}${app_name} instalado com sucesso.${NC}"
     done < <(tail -n +2 "$a_csv_file")
     echo -e "${VERDE}--- INSTALAÇÕES VIA APT CONCLUÍDAS ---${NC}\n"
@@ -122,7 +122,7 @@ instalar_via_deb() {
 
         wget -O "$temp_deb" "$url"
         if [ $? -eq 0 ]; then
-            apt-get install -y "$temp_deb"
+            apt-get install -y "$temp_deb" < /dev/null
             rm "$temp_deb"
             echo -e "${VERDE}${app_name} instalado com sucesso.${NC}"
         else
@@ -154,7 +154,7 @@ instalar_via_flatpak() {
     
     while IFS=, read -r app_name flatpak_id description || [[ -n "$app_name" ]]; do
         echo -e "${VERDE}Instalando ${app_name} (${description})...${NC}"
-        flatpak install -y flathub "$flatpak_id"
+        flatpak install -y flathub "$flatpak_id" < /dev/null
         echo -e "${VERDE}${app_name} instalado com sucesso.${NC}"
     done < <(tail -n +2 "$f_csv_file")
     echo -e "${VERDE}--- INSTALAÇÕES VIA FLATPAK CONCLUÍDAS ---${NC}\n"
