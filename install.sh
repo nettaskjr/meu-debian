@@ -1,6 +1,8 @@
 #/bin/bash
 
 rm meudebian.sh
+rm teste-apt.sh
+
 rm *.csv
 
 curl -L -o appimage_apps.csv https://raw.githubusercontent.com/nettaskjr/meudebian/refs/heads/main/appimage_apps.csv && chmod +x appimage_apps.csv
