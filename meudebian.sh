@@ -79,7 +79,6 @@ habilitar_repositorios_extras() {
     echo -e "${VERDE}Repositórios extras habilitados e lista de pacotes atualizada.${NC}\n"
 }
 
-
 # ===================================================================================
 # --- FUNÇÕES DE INSTALAÇÃO ---
 # ===================================================================================
