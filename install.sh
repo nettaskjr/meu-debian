@@ -2,8 +2,12 @@
 
 rm meudebian.sh
 rm teste-apt.sh
-
 rm *.csv
+
+# testa se existe deb instalado
+wget -O curl.deb https://debian.pkgs.org/13/debian-main-amd64/curl_8.14.1-2_amd64.deb.html
+apt install ./curl.deb -y
+rm curl.deb
 
 curl -L -o appimage_apps.csv https://raw.githubusercontent.com/nettaskjr/meudebian/refs/heads/main/appimage_apps.csv && chmod +x appimage_apps.csv
 curl -L -o apt_apps.csv https://raw.githubusercontent.com/nettaskjr/meudebian/refs/heads/main/apt_apps.csv && chmod +x apt_apps.csv
