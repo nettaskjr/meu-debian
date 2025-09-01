@@ -204,9 +204,9 @@ main() {
 
     # Etapas de instalação
     instalar_via_deb
-    instalar_via_flatpak
     instalar_via_appimage
     instalar_via_apt
+    instalar_via_flatpak
 
     echo -e "${VERDE}====================================================${NC}"
     echo -e "${VERDE}   Script concluído com sucesso!                    ${NC}"
