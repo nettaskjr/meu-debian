@@ -72,11 +72,14 @@ habilitar_repositorios_extras() {
     echo -e "${AMARELO}Habilitando repositórios 'contrib' e 'non-free'...${NC}"
     # Faz um backup do sources.list original
     cp /etc/apt/sources.list /etc/apt/sources.list.bak
+
+    # Desabilita o repositório cdrom, se existir, comentando a linha
+    echo -e "${AMARELO}Desabilitando o repositório CD-ROM (se estiver ativo)...${NC}"
+    sed -i '/^deb cdrom:/s/^/# /' /etc/apt/sources.list
+
     # Adiciona contrib e non-free às linhas existentes
     sed -i 's/main/main contrib non-free/g' /etc/apt/sources.list
-    echo -e "${AMARELO}Atualizando a lista de pacotes após adicionar novos repositórios...${NC}"
-    apt-get update
-    echo -e "${VERDE}Repositórios extras habilitados e lista de pacotes atualizada.${NC}\n"
+    echo -e "${AMARELO}Atualizando a lista de pacotes após adicionar novos repositórios...${NC}\n"
 }
 
 # ===================================================================================
