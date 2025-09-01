@@ -62,7 +62,7 @@ detectar_arquitetura() {
 # Função para instalar as atualizações do sistema
 instalar_atualiacoes() {
     echo -e "${AMARELO}Atualizando lista de pacotes...${NC}"
-    dpkg --configure -a
+    #dpkg --configure -a
     apt-get update
     apt-get dist-upgrade -y
     echo -e "${VERDE}Atualização realiazada com sucesso...${NC}\n"
@@ -209,9 +209,9 @@ main() {
 
     # Etapas de instalação
     instalar_via_deb
-    instalar_via_appimage
-    instalar_via_apt
-    instalar_via_flatpak
+    #instalar_via_appimage
+    #instalar_via_apt
+    #instalar_via_flatpak
 
     echo -e "${VERDE}====================================================${NC}"
     echo -e "${VERDE}   Script concluído com sucesso!                    ${NC}"
