@@ -62,6 +62,7 @@ detectar_arquitetura() {
 # Função para instalar as atualizações do sistema
 instalar_atualiacoes() {
     echo -e "${AMARELO}Atualizando lista de pacotes...${NC}"
+    dpkg --configure -a
     apt-get update
     apt-get dist-upgrade -y
     echo -e "${VERDE}Atualização realiazada com sucesso...${NC}\n"
@@ -79,7 +80,9 @@ habilitar_repositorios_extras() {
 
     # Adiciona contrib e non-free às linhas existentes
     sed -i 's/main/main contrib non-free/g' /etc/apt/sources.list
-    echo -e "${AMARELO}Atualizando a lista de pacotes após adicionar novos repositórios...${NC}\n"
+    echo -e "${AMARELO}Atualizando a lista de pacotes após adicionar novos repositórios...${NC}"
+    apt-get update
+    echo -e "${VERDE}Repositórios extras habilitados e lista de pacotes atualizada.${NC}\n"
 }
 
 # ===================================================================================
@@ -203,7 +206,6 @@ main() {
     verificar_internet
     detectar_arquitetura
     habilitar_repositorios_extras
-    instalar_atualiacoes
 
     # Etapas de instalação
     instalar_via_deb
