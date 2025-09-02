@@ -91,11 +91,11 @@ atualizar_path() {
     # Adiciona /usr/local/sbin:/usr/sbin:/sbin ao PATH se não estiver presente
     if ! grep -q '/usr/local/sbin:/usr/sbin:/sbin' /etc/profile; then
         echo 'export PATH=$PATH:/usr/local/sbin:/usr/sbin:/sbin' >> /etc/profile
-        source /etc/profile
         echo -e "${VERDE}/usr/local/sbin:/usr/sbin:/sbin adicionado ao PATH.${NC}"
     else
         echo -e "${VERDE}/usr/local/sbin:/usr/sbin:/sbin já está no PATH.${NC}"
     fi
+    source /etc/profile
     echo -e "${VERDE}Atualização do PATH concluída.${NC}\n"
 }
 
