@@ -219,18 +219,14 @@ main() {
     verificar_root
     verificar_internet
     detectar_arquitetura
-    instalar_atualiacoes
-    atualizar_path
     habilitar_repositorios_extras
+    apt update && apt dist-upgrade -y
 
     # Etapas de instalação
     instalar_via_deb
     instalar_via_appimage
     instalar_via_apt
     instalar_via_flatpak
-
-    # Atualização final do sistema
-    instalar_atualiacoes
     
     echo -e "${VERDE}====================================================${NC}"
     echo -e "${VERDE}   Script concluído com sucesso!                    ${NC}"
