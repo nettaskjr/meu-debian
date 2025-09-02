@@ -62,7 +62,7 @@ detectar_arquitetura() {
 # Função para instalar as atualizações do sistema
 instalar_atualiacoes() {
     echo -e "${AMARELO}Atualizando lista de pacotes...${NC}"
-    #dpkg --configure -a
+    dpkg --configure -a
     apt-get update
     apt-get dist-upgrade -y
     echo -e "${VERDE}Atualização realiazada com sucesso...${NC}\n"
