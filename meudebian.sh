@@ -216,10 +216,10 @@ main() {
     echo -e "${VERDE}====================================================${NC}\n"
 
     # Etapas de verificação e preparação
-    atualizar_path
     verificar_root
     verificar_internet
     detectar_arquitetura
+    atualizar_path
     habilitar_repositorios_extras
 
     # Etapas de instalação
