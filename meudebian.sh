@@ -61,11 +61,13 @@ detectar_arquitetura() {
 
 # Função para instalar as atualizações do sistema
 instalar_atualiacoes() {
-    echo -e "${AMARELO}Atualizando lista de pacotes...${NC}"
+    echo -e "${AMARELO}Corrigindo o gerenciador de pacotes e atualizando o sistema...${NC}"
     dpkg --configure -a
+    apt-get install -f -y # Tenta corrigir dependências quebradas
     apt-get update
     apt-get dist-upgrade -y
-    echo -e "${VERDE}Atualização realiazada com sucesso...${NC}\n"
+    apt-get autoremove -y --purge # Remove pacotes órfãos e suas configurações
+    echo -e "${VERDE}Sistema atualizado com sucesso.${NC}\n"
 }
 
 # Função para habilitar repositórios contrib e non-free
@@ -149,9 +151,6 @@ instalar_via_deb() {
         fi
     done < <(tail -n +2 "$d_csv_file")
     
-    # atualiza o sistema após instalações via .deb
-    instalar_atualiacoes
-    
     echo -e "${VERDE}--- INSTALAÇÕES VIA .DEB CONCLUÍDAS ---${NC}\n"
 }
 
@@ -187,11 +186,12 @@ instalar_via_appimage() {
     fi
 
     echo -e "${AMARELO}--- INICIANDO DOWNLOADS DE APPIMAGES ---${NC}"
-    local appimage_dir="/usr/local/sbin:/usr/sbin:/sbin"
+    local appimage_dir="/opt/AppImages"
     mkdir -p "$appimage_dir"
 
     while IFS=, read -r app_name url description || [[ -n "$app_name" ]]; do
-        local file_name="${app_name}.AppImage"
+        # Remove espaços para um nome de arquivo seguro
+        local file_name="${app_name// /_}.AppImage"
         local destination="${appimage_dir}/${file_name}"
         echo -e "${VERDE}Baixando ${app_name} (${description})...${NC}"
         wget -O "$destination" "$url"
@@ -219,14 +219,15 @@ main() {
     verificar_root
     verificar_internet
     detectar_arquitetura
+    instalar_atualiacoes
     atualizar_path
     habilitar_repositorios_extras
 
     # Etapas de instalação
     instalar_via_deb
-    #instalar_via_appimage
-    #instalar_via_apt
-    #instalar_via_flatpak
+    instalar_via_appimage
+    instalar_via_apt
+    instalar_via_flatpak
 
     echo -e "${VERDE}====================================================${NC}"
     echo -e "${VERDE}   Script concluído com sucesso!                    ${NC}"
