@@ -85,6 +85,20 @@ habilitar_repositorios_extras() {
     echo -e "${VERDE}Repositórios extras habilitados e lista de pacotes atualizada.${NC}\n"
 }
 
+# Funçao para atualizar o PATH do sistema
+atualizar_path() {
+    echo -e "${AMARELO}Atualizando o PATH do sistema...${NC}"
+    # Adiciona /usr/local/sbin:/usr/sbin:/sbin ao PATH se não estiver presente
+    if ! grep -q '/usr/local/sbin:/usr/sbin:/sbin' /etc/profile; then
+        echo 'export PATH=$PATH:/usr/local/sbin:/usr/sbin:/sbin' >> /etc/profile
+        source /etc/profile
+        echo -e "${VERDE}/usr/local/sbin:/usr/sbin:/sbin adicionado ao PATH.${NC}"
+    else
+        echo -e "${VERDE}/usr/local/sbin:/usr/sbin:/sbin já está no PATH.${NC}"
+    fi
+    echo -e "${VERDE}Atualização do PATH concluída.${NC}\n"
+}
+
 # ===================================================================================
 # --- FUNÇÕES DE INSTALAÇÃO ---
 # ===================================================================================
@@ -173,7 +187,7 @@ instalar_via_appimage() {
     fi
 
     echo -e "${AMARELO}--- INICIANDO DOWNLOADS DE APPIMAGES ---${NC}"
-    local appimage_dir="/opt/AppImages"
+    local appimage_dir="/usr/local/sbin:/usr/sbin:/sbin"
     mkdir -p "$appimage_dir"
 
     while IFS=, read -r app_name url description || [[ -n "$app_name" ]]; do
@@ -202,6 +216,7 @@ main() {
     echo -e "${VERDE}====================================================${NC}\n"
 
     # Etapas de verificação e preparação
+    atualizar_path
     verificar_root
     verificar_internet
     detectar_arquitetura
