@@ -220,6 +220,7 @@ main() {
     verificar_internet
     detectar_arquitetura
     habilitar_repositorios_extras
+    atualizar_path
     apt update && apt dist-upgrade -y
 
     # Etapas de instalação
