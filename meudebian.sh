@@ -228,7 +228,8 @@ main() {
     instalar_via_appimage
     instalar_via_apt
     #instalar_via_flatpak
-    
+    instalar_atualiacoes
+
     echo -e "${VERDE}====================================================${NC}"
     echo -e "${VERDE}   Script concluído com sucesso!                    ${NC}"
     echo -e "${VERDE}====================================================${NC}"
