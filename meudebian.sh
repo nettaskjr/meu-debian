@@ -146,7 +146,7 @@ instalar_via_deb() {
             rm "$temp_deb"
             echo -e "${VERDE}${app_name} instalado com sucesso.${NC}\n"
         else
-            echo -e "${VERMELHO}ERRO: Falha ao baixar o pacote para ${app_name}.${NC}\m"
+            echo -e "${VERMELHO}ERRO: Falha ao baixar o pacote para ${app_name}.${NC}\n"
         fi
     done < <(tail -n +2 "$d_csv_file")
     
@@ -172,7 +172,7 @@ instalar_via_flatpak() {
     while IFS=, read -r app_name flatpak_id description || [[ -n "$app_name" ]]; do
         echo -e "${VERDE}Instalando ${app_name} (${description})...${NC}"
         flatpak install -y flathub "$flatpak_id" < /dev/null
-        echo -e "${VERDE}${app_name} instalado com sucesso.${NC}\m"
+        echo -e "${VERDE}${app_name} instalado com sucesso.${NC}\n"
     done < <(tail -n +2 "$f_csv_file")
     echo -e "${VERDE}--- INSTALAÇÕES VIA FLATPAK CONCLUÍDAS ---${NC}\n"
 }
@@ -227,7 +227,7 @@ main() {
     instalar_atualiacoes
     instalar_via_appimage
     instalar_via_apt
-    instalar_via_flatpak
+    #instalar_via_flatpak
     
     echo -e "${VERDE}====================================================${NC}"
     echo -e "${VERDE}   Script concluído com sucesso!                    ${NC}"
