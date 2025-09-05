@@ -220,15 +220,16 @@ main() {
     detectar_arquitetura
     habilitar_repositorios_extras
     atualizar_path
-    instalar_atualiacoes
 
     # Etapas de instalação
     instalar_via_deb
-    instalar_atualiacoes
-    instalar_via_appimage
-    instalar_via_apt
     #instalar_via_flatpak
+    instalar_via_appimage
     instalar_atualiacoes
+    instalar_via_apt
+    instalar_atualiacoes
+
+
 
     echo -e "${VERDE}====================================================${NC}"
     echo -e "${VERDE}   Script concluído com sucesso!                    ${NC}"
