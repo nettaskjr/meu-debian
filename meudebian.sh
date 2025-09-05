@@ -97,7 +97,7 @@ atualizar_path() {
     else
         echo -e "${VERDE}/usr/local/sbin:/usr/sbin:/sbin já está no PATH.${NC}"
     fi
-    source /etc/profile
+    source "/etc/profile"
     echo -e "${VERDE}Atualização do PATH concluída.${NC}\n"
 }
 
@@ -118,7 +118,7 @@ instalar_via_apt() {
     while IFS=, read -r app_name installer_name description || [[ -n "$app_name" ]]; do
         echo -e "${VERDE}Instalando ${app_name} (${description})...${NC}"
         apt-get install -y "$installer_name" < /dev/null
-        echo -e "${VERDE}${app_name} instalado com sucesso.${NC}"
+        echo -e "${VERDE}${app_name} instalado com sucesso.${NC}\n"
     done < <(tail -n +2 "$a_csv_file")
     echo -e "${VERDE}--- INSTALAÇÕES VIA APT CONCLUÍDAS ---${NC}\n"
 }
@@ -145,9 +145,9 @@ instalar_via_deb() {
         if [ $? -eq 0 ]; then
             apt-get install -y "$temp_deb" < /dev/null
             rm "$temp_deb"
-            echo -e "${VERDE}${app_name} instalado com sucesso.${NC}"
+            echo -e "${VERDE}${app_name} instalado com sucesso.${NC}\n"
         else
-            echo -e "${VERMELHO}ERRO: Falha ao baixar o pacote para ${app_name}.${NC}"
+            echo -e "${VERMELHO}ERRO: Falha ao baixar o pacote para ${app_name}.${NC}\m"
         fi
     done < <(tail -n +2 "$d_csv_file")
     
@@ -173,7 +173,7 @@ instalar_via_flatpak() {
     while IFS=, read -r app_name flatpak_id description || [[ -n "$app_name" ]]; do
         echo -e "${VERDE}Instalando ${app_name} (${description})...${NC}"
         flatpak install -y flathub "$flatpak_id" < /dev/null
-        echo -e "${VERDE}${app_name} instalado com sucesso.${NC}"
+        echo -e "${VERDE}${app_name} instalado com sucesso.${NC}\m"
     done < <(tail -n +2 "$f_csv_file")
     echo -e "${VERDE}--- INSTALAÇÕES VIA FLATPAK CONCLUÍDAS ---${NC}\n"
 }
@@ -197,9 +197,9 @@ instalar_via_appimage() {
         wget -O "$destination" "$url"
         if [ $? -eq 0 ]; then
             chmod +x "$destination"
-            echo -e "${VERDE}${app_name} baixado e tornado executável em ${destination}${NC}"
+            echo -e "${VERDE}${app_name} baixado e tornado executável em ${destination}${NC}\n"
         else
-            echo -e "${VERMELHO}ERRO: Falha ao baixar o AppImage para ${app_name}.${NC}"
+            echo -e "${VERMELHO}ERRO: Falha ao baixar o AppImage para ${app_name}.${NC}\n"
         fi
     done < <(tail -n +2 "$i_csv_file")
     echo -e "${VERDE}--- DOWNLOADS DE APPIMAGES CONCLUÍDOS ---${NC}\n"
