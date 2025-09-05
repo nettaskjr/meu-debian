@@ -224,6 +224,7 @@ main() {
 
     # Etapas de instalação
     instalar_via_deb
+    instalar_atualiacoes
     instalar_via_appimage
     instalar_via_apt
     instalar_via_flatpak
