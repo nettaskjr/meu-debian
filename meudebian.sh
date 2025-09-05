@@ -63,9 +63,9 @@ detectar_arquitetura() {
 instalar_atualiacoes() {
     echo -e "${AMARELO}Corrigindo o gerenciador de pacotes e atualizando o sistema...${NC}"
     dpkg --configure -a
-    apt-get install -f -y # Tenta corrigir dependências quebradas
     apt-get update
     apt-get dist-upgrade -y
+    apt-get install -f -y # Tenta corrigir dependências quebradas
     apt-get autoremove -y --purge # Remove pacotes órfãos e suas configurações
     echo -e "${VERDE}Sistema atualizado com sucesso.${NC}\n"
 }
