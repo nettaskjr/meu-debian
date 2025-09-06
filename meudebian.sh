@@ -32,7 +32,7 @@ verificar_root() {
     echo -e "${AMARELO}Verificando permissões de superusuário...${NC}"
     if [[ "$(id -u)" -ne 0 ]]; then
         echo -e "${VERMELHO}ERRO: Este script precisa ser executado como root.${NC}"
-        echo "Use: sudo ./setup_debian.sh"
+        echo "Use: sudo ./meudebian.sh"
         exit 1
     fi
     echo -e "${VERDE}Verificação de root concluída com sucesso.${NC}\n"
@@ -63,10 +63,10 @@ detectar_arquitetura() {
 instalar_atualiacoes() {
     echo -e "${AMARELO}Corrigindo o gerenciador de pacotes e atualizando o sistema...${NC}"
     dpkg --configure -a
-    apt-get update
-    apt-get dist-upgrade -y
-    apt-get install -f -y # Tenta corrigir dependências quebradas
-    apt-get autoremove -y --purge # Remove pacotes órfãos e suas configurações
+    apt update
+    apt dist-upgrade -y
+    apt install -f -y # Tenta corrigir dependências quebradas
+    apt autoremove -y --purge # Remove pacotes órfãos e suas configurações
     echo -e "${VERDE}Sistema atualizado com sucesso.${NC}\n"
 }
 
@@ -83,19 +83,20 @@ habilitar_repositorios_extras() {
     # Adiciona contrib e non-free às linhas existentes
     sed -i 's/main/main contrib non-free/g' /etc/apt/sources.list
     echo -e "${AMARELO}Atualizando a lista de pacotes após adicionar novos repositórios...${NC}"
-    apt-get update
+    apt update
     echo -e "${VERDE}Repositórios extras habilitados e lista de pacotes atualizada.${NC}\n"
 }
 
 # Funçao para atualizar o PATH do sistema
 atualizar_path() {
     echo -e "${AMARELO}Atualizando o PATH do sistema...${NC}"
-    # Adiciona /usr/local/sbin:/usr/sbin:/sbin ao PATH se não estiver presente
-    if ! grep -q '/usr/local/sbin:/usr/sbin:/sbin' /etc/profile; then
-        echo 'export PATH=$PATH:/usr/local/sbin:/usr/sbin:/sbin' >> /etc/profile
-        echo -e "${VERDE}/usr/local/sbin:/usr/sbin:/sbin adicionado ao PATH.${NC}"
+    # Adiciona pastas ao PATH se não estiver presente
+    pastas="/usr/local/sbin:/usr/sbin:sbin"
+    if ! grep -q $pastas /etc/profile; then
+        echo 'export PATH=$PATH:$pastas' >> /etc/profile
+        echo -e "${VERDE}pastas adicionado ao PATH.${NC}"
     else
-        echo -e "${VERDE}/usr/local/sbin:/usr/sbin:/sbin já está no PATH.${NC}"
+        echo -e "${VERDE}pastas já estão no PATH.${NC}"
     fi
     source "/etc/profile"
     echo -e "${VERDE}Atualização do PATH concluída.${NC}\n"
@@ -117,7 +118,7 @@ instalar_via_apt() {
     # para garantir que a última linha do CSV seja lida, mesmo se não tiver uma quebra de linha no final.
     while IFS=, read -r app_name installer_name description || [[ -n "$app_name" ]]; do
         echo -e "${VERDE}Instalando ${app_name} (${description})...${NC}"
-        apt-get install -y "$installer_name" < /dev/null
+        apt install -y "$installer_name" < /dev/null
         echo -e "${VERDE}${app_name} instalado com sucesso.${NC}\n"
     done < <(tail -n +2 "$a_csv_file")
     echo -e "${VERDE}--- INSTALAÇÕES VIA APT CONCLUÍDAS ---${NC}\n"
@@ -143,7 +144,7 @@ instalar_via_deb() {
 
         wget -O "$temp_deb" "$url"
         if [ $? -eq 0 ]; then
-            apt-get install -y "$temp_deb" < /dev/null
+            apt install -y "$temp_deb" < /dev/null
             rm "$temp_deb"
             echo -e "${VERDE}${app_name} instalado com sucesso.${NC}\n"
         else
@@ -165,7 +166,7 @@ instalar_via_flatpak() {
     # Verifica se o flatpak está instalado
     if ! command -v flatpak &> /dev/null; then
         echo "Flatpak não encontrado. Instalando..."
-        apt-get install -y flatpak gnome-software-plugin-flatpak
+        apt install -y flatpak gnome-software-plugin-flatpak
     fi
     # Adiciona o repositório Flathub
     flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
@@ -229,8 +230,6 @@ main() {
     instalar_atualiacoes
     instalar_via_apt
     instalar_atualiacoes
-
-
 
     echo -e "${VERDE}====================================================${NC}"
     echo -e "${VERDE}   Script concluído com sucesso!                    ${NC}"
