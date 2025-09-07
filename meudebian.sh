@@ -18,6 +18,7 @@
 VERDE='\033[0;32m'
 AMARELO='\033[1;33m'
 VERMELHO='\033[0;31m'
+AZUL='\033[0;34m'
 NC='\033[0m' # Sem Cor
 
 # --- VARIÁVEIS GLOBAIS ---
@@ -72,7 +73,7 @@ instalar_atualiacoes() {
 
 # Função para habilitar repositórios contrib e non-free
 habilitar_repositorios_extras() {
-    echo -e "${AMARELO}Habilitando repositórios 'contrib' e 'non-free'...${NC}"
+    echo -e "${AMARELO}Verificando e habilitando repositórios 'contrib' e 'non-free'...${NC}"
     # Faz um backup do sources.list original
     cp /etc/apt/sources.list /etc/apt/sources.list.bak
 
@@ -80,11 +81,16 @@ habilitar_repositorios_extras() {
     echo -e "${AMARELO}Desabilitando o repositório CD-ROM (se estiver ativo)...${NC}"
     sed -i '/^deb cdrom:/s/^/# /' /etc/apt/sources.list
 
-    # Adiciona contrib e non-free às linhas existentes
-    sed -i 's/main/main contrib non-free/g' /etc/apt/sources.list
-    echo -e "${AMARELO}Atualizando a lista de pacotes após adicionar novos repositórios...${NC}"
+    # Verifica se 'contrib' e 'non-free' já estão em uma linha de repositório ativa
+    if grep -qE '^\s*deb\s.*main\s+contrib\s+non-free' /etc/apt/sources.list; then
+        echo -e "${VERDE}Repositórios 'contrib' e 'non-free' já estão habilitados.${NC}"
+    else
+        echo -e "${AMARELO}Adicionando 'contrib' e 'non-free' ao sources.list...${NC}"
+        sed -i 's/main/main contrib non-free/g' /etc/apt/sources.list
+    fi
+    echo -e "${AMARELO}Atualizando a lista de pacotes...${NC}"
     apt update
-    echo -e "${VERDE}Repositórios extras habilitados e lista de pacotes atualizada.${NC}\n"
+    echo -e "${VERDE}Verificação de repositórios concluída e lista de pacotes atualizada.${NC}\n"
 }
 
 # Funçao para atualizar o PATH do sistema
@@ -109,7 +115,7 @@ atualizar_path() {
 instalar_via_apt() {
     local a_csv_file="apt_apps.csv"
     if [ ! -f "$a_csv_file" ]; then
-        echo -e "${AMARELO}Arquivo ${a_csv_file} não encontrado. Pulando instalações via APT.${NC}"
+        echo -e "${VERMELHO}Arquivo ${a_csv_file} não encontrado. Pulando instalações via APT.${NC}"
         return
     fi
 
@@ -117,7 +123,7 @@ instalar_via_apt() {
     # Usar substituição de processo (< <(...)) e verificar a variável (|| [[ -n ... ]])
     # para garantir que a última linha do CSV seja lida, mesmo se não tiver uma quebra de linha no final.
     while IFS=, read -r app_name installer_name description || [[ -n "$app_name" ]]; do
-        echo -e "${VERDE}Instalando ${app_name} (${description})...${NC}"
+        echo -e "${AMARELO}Instalando ${app_name} (${description})...${NC}"
         apt install -y "$installer_name" < /dev/null
         echo -e "${VERDE}${app_name} instalado com sucesso.${NC}\n"
     done < <(tail -n +2 "$a_csv_file")
@@ -127,14 +133,14 @@ instalar_via_apt() {
 instalar_via_deb() {
     local d_csv_file="deb_apps.csv"
     if [ ! -f "$d_csv_file" ]; then
-        echo -e "${AMARELO}Arquivo ${d_csv_file} não encontrado. Pulando instalações via .deb.${NC}"
+        echo -e "${VERMELHO}Arquivo ${d_csv_file} não encontrado. Pulando instalações via .deb.${NC}"
         return
     fi
     
     echo -e "${AMARELO}--- INICIANDO INSTALAÇÕES VIA PACOTES .DEB ---${NC}"
     local temp_deb="/tmp/temp_package.deb"
     while IFS=, read -r app_name url description || [[ -n "$app_name" ]]; do
-        echo -e "${VERDE}Instalando ${app_name} (${description})...${NC}"
+        echo -e "${AMARELO}Instalando ${app_name} (${description})...${NC}"
         
         # Adiciona verificação de arquitetura para o exemplo do Chrome
         if [[ "$app_name" == "Google Chrome" && "$ARQUITETURA" != "amd64" ]]; then
@@ -158,7 +164,7 @@ instalar_via_deb() {
 instalar_via_flatpak() {
     local f_csv_file="flatpak_apps.csv"
     if [ ! -f "$f_csv_file" ]; then
-        echo -e "${AMARELO}Arquivo ${f_csv_file} não encontrado. Pulando instalações via Flatpak.${NC}"
+        echo -e "${VERMELHO}Arquivo ${f_csv_file} não encontrado. Pulando instalações via Flatpak.${NC}"
         return
     fi
 
@@ -172,7 +178,7 @@ instalar_via_flatpak() {
     flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
     
     while IFS=, read -r app_name flatpak_id description || [[ -n "$app_name" ]]; do
-        echo -e "${VERDE}Instalando ${app_name} (${description})...${NC}"
+        echo -e "${AMARELO}Instalando ${app_name} (${description})...${NC}"
         flatpak install -y flathub "$flatpak_id" < /dev/null
         echo -e "${VERDE}${app_name} instalado com sucesso.${NC}\n"
     done < <(tail -n +2 "$f_csv_file")
@@ -182,8 +188,24 @@ instalar_via_flatpak() {
 instalar_via_appimage() {
     local i_csv_file="appimage_apps.csv"
     if [ ! -f "$i_csv_file" ]; then
-        echo -e "${AMARELO}Arquivo ${i_csv_file} não encontrado. Pulando instalações via AppImage.${NC}"
+        echo -e "${VERMELHO}Arquivo ${i_csv_file} não encontrado. Pulando instalações via AppImage.${NC}"
         return
+    fi
+
+    echo -e "${AMARELO}--- CONFIGURANDO E INICIANDO INSTALAÇÕES DAS IMAGENS ---${NC}"
+    # Verifica se o flatpak está instalado
+    if ! command -v flatpak &> /dev/null; then
+        echo "Flatpak não encontrado. Instalando..."
+        apt install -y flatpak gnome-software-plugin-flatpak
+
+        # Adiciona o repositório Flathub
+        flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+    fi
+    
+    # Verifica se o GearLever está instalado
+    if ! flatpak run it.mijorus.guearlever &> /dev/null; then
+        echo "GearLever não encontrado. Instalando..."
+        apt flatpak install -y flathub it.mijorus.GearLever < /dev/null
     fi
 
     echo -e "${AMARELO}--- INICIANDO DOWNLOADS DE APPIMAGES ---${NC}"
@@ -240,3 +262,4 @@ main() {
 
 # --- PONTO DE ENTRADA DO SCRIPT ---
 main
+pause
