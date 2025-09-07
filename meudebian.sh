@@ -244,8 +244,8 @@ main() {
     verificar_root
     verificar_internet
     detectar_arquitetura
-    habilitar_repositorios_extras
     atualizar_path
+    habilitar_repositorios_extras
 
     # Etapas de instalação
     instalar_via_deb
