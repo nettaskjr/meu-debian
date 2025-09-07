@@ -89,7 +89,7 @@ habilitar_repositorios_extras() {
         sed -i 's/main/main contrib non-free/g' /etc/apt/sources.list
     fi
     echo -e "${AMARELO}Atualizando a lista de pacotes...${NC}"
-    apt update
+    instalar_atualiacoes
     echo -e "${VERDE}Verificação de repositórios concluída e lista de pacotes atualizada.${NC}\n"
 }
 
@@ -122,6 +122,8 @@ instalar_via_apt() {
     echo -e "${AMARELO}--- INICIANDO INSTALAÇÕES VIA APT ---${NC}"
     # Usar substituição de processo (< <(...)) e verificar a variável (|| [[ -n ... ]])
     # para garantir que a última linha do CSV seja lida, mesmo se não tiver uma quebra de linha no final.
+    echo -e "${AMARELO}Atualizando a lista de pacotes...${NC}"
+    instalar_atualiacoes
     while IFS=, read -r app_name installer_name description || [[ -n "$app_name" ]]; do
         echo -e "${AMARELO}Instalando ${app_name} (${description})...${NC}"
         apt install -y "$installer_name" < /dev/null
@@ -249,7 +251,6 @@ main() {
     instalar_via_deb
     instalar_via_flatpak
     instalar_via_appimage
-    instalar_atualiacoes
     instalar_via_apt
     instalar_atualiacoes
 
