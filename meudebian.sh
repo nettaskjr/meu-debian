@@ -205,7 +205,7 @@ instalar_via_appimage() {
     # Verifica se o GearLever está instalado
     if ! flatpak run it.mijorus.guearlever &> /dev/null; then
         echo "GearLever não encontrado. Instalando..."
-        apt flatpak install -y flathub it.mijorus.GearLever < /dev/null
+        flatpak install -y flathub it.mijorus.GearLever < /dev/null
     fi
 
     echo -e "${AMARELO}--- INICIANDO DOWNLOADS DE APPIMAGES ---${NC}"
