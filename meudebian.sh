@@ -89,7 +89,6 @@ habilitar_repositorios_extras() {
         sed -i 's/main/main contrib non-free/g' /etc/apt/sources.list
     fi
     echo -e "${AMARELO}Atualizando a lista de pacotes...${NC}"
-    instalar_atualiacoes
     echo -e "${VERDE}Verificação de repositórios concluída e lista de pacotes atualizada.${NC}\n"
 }
 
@@ -140,11 +139,14 @@ instalar_via_apt() {
     # Usar substituição de processo (< <(...)) e verificar a variável (|| [[ -n ... ]])
     # para garantir que a última linha do CSV seja lida, mesmo se não tiver uma quebra de linha no final.
     echo -e "${AMARELO}Atualizando a lista de pacotes...${NC}"
-    instalar_atualiacoes
+    apt update
     while IFS=, read -r app_name installer_name description || [[ -n "$app_name" ]]; do
         echo -e "${AMARELO}Instalando ${app_name} (${description})...${NC}"
-        apt install -y "$installer_name" < /dev/null
-        echo -e "${VERDE}${app_name} instalado com sucesso.${NC}\n"
+        if apt install -y "$installer_name" < /dev/null; then
+            echo -e "${VERDE}${app_name} instalado com sucesso.${NC}\n"
+        else
+            echo -e "${VERMELHO}ERRO: A instalação de ${app_name} não foi bem-sucedida.${NC}\n"
+        fi
     done < <(tail -n +2 "$a_csv_file")
     echo -e "${VERDE}--- INSTALAÇÕES VIA APT CONCLUÍDAS ---${NC}\n"
 }
@@ -169,13 +171,17 @@ instalar_via_deb() {
 
         wget -O "$temp_deb" "$url"
         if [ $? -eq 0 ]; then
-            apt install -y "$temp_deb" < /dev/null
+            if apt install -y "$temp_deb" < /dev/null; then
+                echo -e "${VERDE}${app_name} instalado com sucesso.${NC}\n"
+            else
+                echo -e "${VERMELHO}ERRO: Falha ao instalar o pacote .deb para ${app_name}.${NC}\n"
+            fi
             rm "$temp_deb"
-            echo -e "${VERDE}${app_name} instalado com sucesso.${NC}\n"
         else
             echo -e "${VERMELHO}ERRO: Falha ao baixar o pacote para ${app_name}.${NC}\n"
         fi
     done < <(tail -n +2 "$d_csv_file")
+    apt update
     
     echo -e "${VERDE}--- INSTALAÇÕES VIA .DEB CONCLUÍDAS ---${NC}\n"
 }
@@ -194,7 +200,7 @@ instalar_via_flatpak() {
     # Verifica se o flatpak está instalado
     if ! command -v flatpak &> /dev/null; then
         echo "Flatpak não encontrado. Instalando..."
-        instalar_atualiacoes
+        apt update
         apt install -y flatpak gnome-software-plugin-flatpak
     fi
     # Adiciona o repositório Flathub
@@ -219,7 +225,7 @@ instalar_via_appimage() {
     # Verifica se o flatpak está instalado
     if ! command -v flatpak &> /dev/null; then
         echo "Flatpak não encontrado. Instalando..."
-        instalar_atualiacoes
+        apt update
         apt install -y flatpak gnome-software-plugin-flatpak
 
         # Adiciona o repositório Flathub
@@ -267,6 +273,7 @@ main() {
     detectar_arquitetura
     atualizar_path
     habilitar_repositorios_extras
+    instalar_atualiacoes
 
     # Etapas de instalação
     instalar_via_deb deb_apps.csv
