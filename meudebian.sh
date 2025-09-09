@@ -74,8 +74,8 @@ instalar_atualiacoes() {
 # Função para habilitar repositórios contrib e non-free
 habilitar_repositorios_extras() {
     echo -e "${AMARELO}Verificando e habilitando repositórios 'contrib' e 'non-free'...${NC}"
-    # Faz um backup do sources.list original
-    cp /etc/apt/sources.list /etc/apt/sources.list.bak
+    # Faz um backup do sources.list original com timestamp
+    cp /etc/apt/sources.list /etc/apt/sources.list.bak-$(date +%Y%m%d-%H%M%S)
 
     # Desabilita o repositório cdrom, se existir, comentando a linha
     echo -e "${AMARELO}Desabilitando o repositório CD-ROM (se estiver ativo)...${NC}"
@@ -93,7 +93,7 @@ habilitar_repositorios_extras() {
     echo -e "${VERDE}Verificação de repositórios concluída e lista de pacotes atualizada.${NC}\n"
 }
 
-# Funçao para atualizar o PATH do sistema
+# Funçao para atualizar as variaveis de ambiente PATH
 atualizar_path() {
     echo -e "${AMARELO}Atualizando o PATH do sistema...${NC}"
     # Adiciona pastas ao PATH se não estiver presente
@@ -104,8 +104,25 @@ atualizar_path() {
     else
         echo -e "${VERDE}pastas já estão no PATH.${NC}"
     fi
+    # Recarrega o profile para aplicar as mudanças imediatamente
     source "/etc/profile"
     echo -e "${VERDE}Atualização do PATH concluída.${NC}\n"
+}
+
+# Funçao para atualizar as variaveis de ambiente do flatpak
+atualizar_variavel_flatpak() {
+    echo -e "${AMARELO}Atualizando o as variáveis de ambiente do sistema (flatpak)...${NC}"
+    # Adiciona pastas ao PATH se não estiver presente
+    pastas="/var/lib/flatpak/exports/share:/root/.local/share/flatpak/exports/share"
+    if ! grep -q $pastas /etc/profile; then
+        echo 'export XDG_DATA_DIRS=$pastas' >> /etc/profile
+        echo -e "${VERDE}pastas adicionado a variável de ambiente do sistema.${NC}"
+    else
+        echo -e "${VERDE}pastas já estão na variável de ambiente do sistema.${NC}"
+    fi
+    # Recarrega o profile para aplicar as mudanças imediatamente
+    source "/etc/profile"
+    echo -e "${VERDE}Atualização da variável de sistema concluída.${NC}\n"
 }
 
 # ===================================================================================
@@ -113,7 +130,7 @@ atualizar_path() {
 # ===================================================================================
 
 instalar_via_apt() {
-    local a_csv_file="apt_apps.csv"
+    local a_csv_file="$1"
     if [ ! -f "$a_csv_file" ]; then
         echo -e "${VERMELHO}Arquivo ${a_csv_file} não encontrado. Pulando instalações via APT.${NC}"
         return
@@ -133,7 +150,7 @@ instalar_via_apt() {
 }
 
 instalar_via_deb() {
-    local d_csv_file="deb_apps.csv"
+    local d_csv_file="$1"
     if [ ! -f "$d_csv_file" ]; then
         echo -e "${VERMELHO}Arquivo ${d_csv_file} não encontrado. Pulando instalações via .deb.${NC}"
         return
@@ -164,11 +181,14 @@ instalar_via_deb() {
 }
 
 instalar_via_flatpak() {
-    local f_csv_file="flatpak_apps.csv"
+    local f_csv_file="$1"
     if [ ! -f "$f_csv_file" ]; then
         echo -e "${VERMELHO}Arquivo ${f_csv_file} não encontrado. Pulando instalações via Flatpak.${NC}"
         return
     fi
+
+    # atualiza as variaveis de ambiente do flatpak
+    atualizar_variavel_flatpak
 
     echo -e "${AMARELO}--- CONFIGURANDO E INICIANDO INSTALAÇÕES VIA FLATPAK ---${NC}"
     # Verifica se o flatpak está instalado
@@ -188,7 +208,7 @@ instalar_via_flatpak() {
 }
 
 instalar_via_appimage() {
-    local i_csv_file="appimage_apps.csv"
+    local i_csv_file="$1"
     if [ ! -f "$i_csv_file" ]; then
         echo -e "${VERMELHO}Arquivo ${i_csv_file} não encontrado. Pulando instalações via AppImage.${NC}"
         return
@@ -230,7 +250,6 @@ instalar_via_appimage() {
     echo -e "${VERDE}--- DOWNLOADS DE APPIMAGES CONCLUÍDOS ---${NC}\n"
 }
 
-
 # ===================================================================================
 # --- FUNÇÃO PRINCIPAL ---
 # ===================================================================================
@@ -248,10 +267,10 @@ main() {
     habilitar_repositorios_extras
 
     # Etapas de instalação
-    instalar_via_deb
-    instalar_via_flatpak
-    instalar_via_appimage
-    instalar_via_apt
+    instalar_via_deb deb_apps.csv
+    instalar_via_flatpak flatpak_apps.csv
+    instalar_via_appimage appimage_apps.csv
+    instalar_via_apt apt_apps.csv
     instalar_atualiacoes
 
     echo -e "${VERDE}====================================================${NC}"
