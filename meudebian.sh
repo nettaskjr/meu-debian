@@ -194,6 +194,7 @@ instalar_via_flatpak() {
     # Verifica se o flatpak está instalado
     if ! command -v flatpak &> /dev/null; then
         echo "Flatpak não encontrado. Instalando..."
+        instalar_atualiacoes
         apt install -y flatpak gnome-software-plugin-flatpak
     fi
     # Adiciona o repositório Flathub
@@ -218,6 +219,7 @@ instalar_via_appimage() {
     # Verifica se o flatpak está instalado
     if ! command -v flatpak &> /dev/null; then
         echo "Flatpak não encontrado. Instalando..."
+        instalar_atualiacoes
         apt install -y flatpak gnome-software-plugin-flatpak
 
         # Adiciona o repositório Flathub
@@ -227,7 +229,7 @@ instalar_via_appimage() {
     # Verifica se o GearLever está instalado
     if ! flatpak run it.mijorus.guearlever &> /dev/null; then
         echo "GearLever não encontrado. Instalando..."
-        flatpak install -y flathub it.mijorus.GearLever < /dev/null
+        flatpak install -y flathub it.mijorus.gearlever < /dev/null
     fi
 
     echo -e "${AMARELO}--- INICIANDO DOWNLOADS DE APPIMAGES ---${NC}"
