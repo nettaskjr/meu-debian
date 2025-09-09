@@ -201,7 +201,7 @@ instalar_via_flatpak() {
     if ! command -v flatpak &> /dev/null; then
         echo "Flatpak não encontrado. Instalando..."
         apt update
-        apt install -y flatpak gnome-software-plugin-flatpak
+        apt install -y flatpak
     fi
     # Adiciona o repositório Flathub
     flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
