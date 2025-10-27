@@ -96,10 +96,10 @@ habilitar_repositorios_extras() {
 atualizar_path() {
     echo -e "${AMARELO}Atualizando o PATH do sistema...${NC}"
     # Adiciona pastas ao PATH se não estiver presente
-    pastas="/usr/local/sbin:/usr/sbin:/sbin"
-    if ! grep -q $pastas /etc/profile; then
-        echo 'pastas=$pastas' >> /etc/profile
-        echo 'export PATH=$PATH:$pastas' >> /etc/profile
+    PASTAS="/usr/local/sbin:/usr/sbin:/sbin"
+    if ! grep -q $PASTAS /etc/profile; then
+        echo "PASTAS=$PASTAS" >> /etc/profile
+        echo 'export PATH=$PATH:$PASTAS' >> /etc/profile
         echo -e "${VERDE}pastas adicionado ao PATH.${NC}"
     else
         echo -e "${VERDE}pastas já estão no PATH.${NC}"
