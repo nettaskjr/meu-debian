@@ -97,7 +97,7 @@ atualizar_path() {
     echo -e "${AMARELO}Atualizando o PATH do sistema...${NC}"
     # Adiciona pastas ao PATH se não estiver presente
     pastas="/usr/local/sbin:/usr/sbin:/sbin"
-    f ! grep -q $pastas /etc/profile; then
+    if ! grep -q $pastas /etc/profile; then
         echo 'pastas=$pastas' >> /etc/profile
         echo 'export PATH=$PATH:$pastas' >> /etc/profile
         echo -e "${VERDE}pastas adicionado ao PATH.${NC}"
