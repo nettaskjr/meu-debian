@@ -109,22 +109,6 @@ atualizar_path() {
     echo -e "${VERDE}Atualização do PATH concluída.${NC}\n"
 }
 
-# Funçao para atualizar as variaveis de ambiente do flatpak
-atualizar_variavel_flatpak() {
-    echo -e "${AMARELO}Atualizando o as variáveis de ambiente do sistema (flatpak)...${NC}"
-    # Adiciona pastas ao PATH se não estiver presente
-    pastas="/var/lib/flatpak/exports/share:/root/.local/share/flatpak/exports/share"
-    if ! grep -q $pastas /etc/profile; then
-        echo 'export XDG_DATA_DIRS=$pastas' >> /etc/profile
-        echo -e "${VERDE}pastas adicionado a variável de ambiente do sistema.${NC}"
-    else
-        echo -e "${VERDE}pastas já estão na variável de ambiente do sistema.${NC}"
-    fi
-    # Recarrega o profile para aplicar as mudanças imediatamente
-    source "/etc/profile"
-    echo -e "${VERDE}Atualização da variável de sistema concluída.${NC}\n"
-}
-
 # ===================================================================================
 # --- FUNÇÕES DE INSTALAÇÃO ---
 # ===================================================================================
@@ -193,9 +177,6 @@ instalar_via_flatpak() {
         echo -e "${VERMELHO}Arquivo ${f_csv_file} não encontrado. Pulando instalações via Flatpak.${NC}"
         return
     fi
-
-    # atualiza as variaveis de ambiente do flatpak
-    # atualizar_variavel_flatpak
 
     echo -e "${AMARELO}--- CONFIGURANDO E INICIANDO INSTALAÇÕES VIA FLATPAK ---${NC}"
     # Verifica se o flatpak está instalado
