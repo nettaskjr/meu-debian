@@ -6,5 +6,5 @@ rm *.csv
 wget https://raw.githubusercontent.com/nettaskjr/meudebian/refs/heads/main/appimage_apps.csv
 wget https://raw.githubusercontent.com/nettaskjr/meudebian/refs/heads/main/apt_apps.csv
 wget https://raw.githubusercontent.com/nettaskjr/meudebian/refs/heads/main/deb_apps.csv
-wget csv https://raw.githubusercontent.com/nettaskjr/meudebian/refs/heads/main/flatpak_apps.csv
-wget https://raw.githubusercontent.com/nettaskjr/meudebian/refs/heads/main/meudebian.sh && chmod +x meu-debian.sh
+wget https://raw.githubusercontent.com/nettaskjr/meudebian/refs/heads/main/flatpak_apps.csv
+wget https://raw.githubusercontent.com/nettaskjr/meudebian/refs/heads/main/meu-debian.sh && chmod +x meu-debian.sh
