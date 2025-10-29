@@ -33,7 +33,8 @@ verificar_root() {
     echo -e "${AMARELO}Verificando permissões de superusuário...${NC}"
     if [[ "$(id -u)" -ne 0 ]]; then
         echo -e "${VERMELHO}ERRO: Este script precisa ser executado como root.${NC}"
-        echo "Use: sudo ./meudebian.sh"
+        echo "Use: su"
+        echo "     ./meu-debian.sh"
         exit 1
     fi
     echo -e "${VERDE}Verificação de root concluída com sucesso.${NC}\n"
