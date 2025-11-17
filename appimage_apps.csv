@@ -1,3 +1,4 @@
 nome_do_aplicativo,url_do_appimage,descricao
 Kdenlive,https://download.kde.org/stable/kdenlive/25.08/linux/kdenlive-25.08.0-x86_64.AppImage,"Editor de vídeo não-linear profissional"
 LM-Studio,https://installers.lmstudio.ai/linux/x64/0.3.30-2/LM-Studio-0.3.30-2-x64.AppImage,"Gerenciador de LLM's locais"
+UBPorts,https://github.com/ubports/ubports-installer/releases/download/0.11.2/ubports-installer_0.11.2_linux_x86_64.AppImage,"Instalador do Ubuntu Touch"
