@@ -1,3 +1,4 @@
-nome_do_aplicativo,nome_scritp,descricao
+nome_do_aplicativo,nome_script,descricao
 Antigravity,antigravity.sh,"Ide do google com foco em IA"
 Docker,docker.sh,"Plataforma para desenvolver, enviar e executar aplicativos em contêineres"
+Linuxtoys,linuxtoys.sh,"Coleção de pequenos utilitários para Linux"
