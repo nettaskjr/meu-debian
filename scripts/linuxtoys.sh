@@ -1,0 +1,1 @@
+curl -fsSL https://linux.toys/install.sh | bash
