@@ -1,0 +1,38 @@
+Esse erro indica que o KVM/KVM Intel já está usando a virtualização por hardware do seu processador, então o VirtualBox não consegue assumir o controle da VT-x/AMD-V. A causa mais comum é o módulo kvm estar carregado no kernel.
+
+O que fazer
+Se você estiver em Linux, teste primeiro descarregar o KVM antes de abrir o VirtualBox:
+
+bash
+sudo modprobe -r kvm_intel
+sudo modprobe -r kvm
+Em CPUs AMD, use:
+
+bash
+sudo modprobe -r kvm_amd
+sudo modprobe -r kvm
+Isso costuma resolver temporariamente até o próximo reboot.
+
+Correção permanente
+Para impedir que o KVM volte a carregar automaticamente, crie um arquivo de blacklist em /etc/modprobe.d/, por exemplo:
+
+bash
+sudo nano /etc/modprobe.d/blacklist-kvm.conf
+Adicione:
+
+text
+blacklist kvm
+blacklist kvm_intel
+ou, em AMD:
+
+text
+blacklist kvm
+blacklist kvm_amd
+Depois atualize o initramfs e reinicie.
+
+bash
+sudo update-initramfs -u
+sudo reboot
+
+Observação importante
+Se você usa GNOME Boxes, virt-manager, QEMU ou outra VM baseada em KVM ao mesmo tempo, pode haver conflito porque ambos tentam usar a mesma aceleração de virtualização.
