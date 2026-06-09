@@ -7,7 +7,6 @@ wget
 terraform
 lsb-release
 awscli
-ocicli
 
 node
 ----
@@ -29,3 +28,7 @@ npm -v # Deve imprimir "11.13.0".
 opencode
 --------
 curl -fsSL https://opencode.ai/install | bash
+
+ocicli
+------
+bash -c "$(curl -L https://raw.githubusercontent.com/oracle/oci-cli/master/scripts/install/install.sh)"   
