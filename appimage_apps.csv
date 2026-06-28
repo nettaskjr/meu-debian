@@ -1,3 +1,4 @@
 nome_do_aplicativo,url_do_appimage,descricao
 LM-Studio,https://installers.lmstudio.ai/linux/x64/0.4.15-2/LM-Studio-0.4.15-2-x64.AppImage,"Gerenciador de LLM's locais"
 UBPorts,https://github.com/ubports/ubports-installer/releases/download/0.11.2/ubports-installer_0.11.2_linux_x86_64.AppImage,"Instalador do Ubuntu Touch"
+Stacer,https://github.com/oguzhaninan/Stacer/releases/download/v1.1.0/Stacer-1.1.0-x64.AppImage -O stacer.appimage,"Melhora o desempenho do linux"
