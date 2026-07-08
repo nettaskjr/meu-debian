@@ -76,9 +76,13 @@ echo "=== Adicionando usuário atual ao grupo vboxusers ==="
 sudo usermod -aG vboxusers $USER
 
 echo "=== Verificando instalação ==="
-vboxmanage --version
+
 
 echo
-echo "=== Instalação concluída! ==="
-echo "IMPORTANTE: Você deve reiniciar o sistema para aplicar as mudanças nos módulos do kernel"
+echo "=============================================="
+echo "VirtualBox versão: $(vboxmanage --version)"
+echo
+echo "✅ VirtualBox instalado com sucesso!"
+echo "⚠️ Você deve reiniciar o sistema para aplicar as mudanças nos módulos do kernel"
 echo "e as permissões de grupo: sudo reboot"
+echo "=============================================="

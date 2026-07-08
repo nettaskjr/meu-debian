@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-appNome="Linux Toys"
+appNome="Firefox-esr"
 appNomeLower=$(echo "$appNome" | tr '[:upper:]' '[:lower:]')
 
 echo "=== ➡️ Instalando $appNome ==="
@@ -11,7 +11,7 @@ sudo apt update -y
 sudo apt upgrade -y
 
 echo "=== ➡️ Instalando $appNome ==="
-curl -fsSL https://linux.toys/install.sh | bash
+sudo apt install -y $appNomeLower
 
 echo
 echo "=============================================="

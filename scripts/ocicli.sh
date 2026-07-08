@@ -1,8 +1,8 @@
 #!/bin/bash
 set -e
 
-appNome="Linux Toys"
-appNomeLower=$(echo "$appNome" | tr '[:upper:]' '[:lower:]')
+appNome="OCI-CLI"
+appNomeLower=oci
 
 echo "=== ➡️ Instalando $appNome ==="
 
@@ -11,7 +11,7 @@ sudo apt update -y
 sudo apt upgrade -y
 
 echo "=== ➡️ Instalando $appNome ==="
-curl -fsSL https://linux.toys/install.sh | bash
+bash -c "$(curl -L https://raw.githubusercontent.com/oracle/oci-cli/master/scripts/install/install.sh)"
 
 echo
 echo "=============================================="
