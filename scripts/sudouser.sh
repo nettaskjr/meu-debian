@@ -96,5 +96,7 @@ case "$opcao" in
 esac
 
 echo
-echo "⚠️  Para que as alterações tenham efeito, o usuário precisa sair e entrar novamente na sessão."
-echo
+echo "=============================================="
+echo "  Para aplicar a alteração, execute:"
+echo "  source /etc/sudoers"
+echo "=============================================="
