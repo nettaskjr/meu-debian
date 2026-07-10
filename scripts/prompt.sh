@@ -34,7 +34,7 @@ parse_git_branch() {
 }
 GITFUNC
 
-    printf 'PS1="\\[\\033[01;%sm\\]\\u@\\h\\[\\033[00m\\] \\[\\033[01;34m\\]\\w\\[\\033[00m\\]\\$(parse_git_branch)\\n\\[\\033[01;%sm\\]\\342\\235\\257 \\[\\033[00m\\]"\n' "$cor_usuario" "$cor_usuario" >> "$bashrc_path"
+    printf 'PS1="\\[\\033[01;%sm\\]\\u@\\h \\$(lsb_release -cs)\\[\\033[00m\\] \\[\\033[01;34m\\]\\w\\[\\033[00m\\]\\$(parse_git_branch)\\n\\[\\033[01;%sm\\]\\342\\224\\224\\342\\224\\200\\342\\224\\200> \\[\\033[00m\\]"\n' "$cor_usuario" "$cor_usuario" >> "$bashrc_path"
 
     echo "=== ✅ Prompt ($tipo) adicionado a $bashrc_path ==="
 }
@@ -54,6 +54,14 @@ else
     else
         echo "=== ⚠️ Arquivo /root/.bashrc não encontrado. Pulando ==="
     fi
+
+    echo
+    echo "=== ➡️ Configurando prompt para novos usuários (/etc/skel) ==="
+    if [ -f /etc/skel/.bashrc ] || [ -d /etc/skel ]; then
+        sudo bash -c "PROMPT_MARKER='$PROMPT_MARKER'; $(declare -f instalar_prompt); instalar_prompt /etc/skel/.bashrc 32 skel"
+    else
+        echo "=== ⚠️ Diretório /etc/skel não encontrado. Pulando ==="
+    fi
 fi
 
 echo
@@ -62,8 +70,8 @@ echo "  Para aplicar o novo prompt, execute:"
 echo "  source ~/.bashrc"
 echo
 echo "  Formato do prompt:"
-echo "  usuário@host ~/caminho (⎇ branch)"
-echo "  ❯ "
+echo "  usuário@host codename ~/caminho (⎇ branch)"
+echo "  └──> "
 echo
 echo "  Cores: verde = usuário  |  vermelho = root"
 echo "=============================================="

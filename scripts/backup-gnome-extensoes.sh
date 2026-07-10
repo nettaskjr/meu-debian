@@ -4,7 +4,7 @@ set -e
 appNome="Backup Extensões GNOME"
 
 DIR_EXTENSOES="$HOME/.local/share/gnome-shell/extensions"
-DIR_BACKUP_BASE="$HOME/backups/gnome-extensoes"
+DIR_BACKUP_BASE="$HOME/Backups/gnome-extensoes"
 DATA=$(date +%Y-%m-%d_%H-%M-%S)
 DIR_BACKUP="$DIR_BACKUP_BASE/$DATA"
 
