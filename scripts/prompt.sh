@@ -34,7 +34,7 @@ parse_git_branch() {
 }
 GITFUNC
 
-    printf 'PS1="\\[\\033[01;%sm\\]\\u@\\h \\$(lsb_release -cs)\\[\\033[00m\\] \\[\\033[01;34m\\]\\w\\[\\033[00m\\]\\$(parse_git_branch)\\n\\[\\033[01;%sm\\]\\342\\224\\224\\342\\224\\200\\342\\224\\200> \\[\\033[00m\\]"\n' "$cor_usuario" "$cor_usuario" >> "$bashrc_path"
+    printf 'PS1="\\n\\[\\033[01;%sm\\]\\u@\\h \\$(lsb_release -ds)\\[\\033[00m\\] \\[\\033[01;34m\\]\\w\\[\\033[00m\\]\\$(parse_git_branch)\\n\\[\\033[01;%sm\\]\\342\\224\\224\\342\\224\\200\\342\\224\\200> \\[\\033[00m\\]"\n' "$cor_usuario" "$cor_usuario" >> "$bashrc_path"
 
     echo "=== ✅ Prompt ($tipo) adicionado a $bashrc_path ==="
 }
