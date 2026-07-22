@@ -8,9 +8,6 @@ echo "  🔧 Configuracao de $appNome"
 echo "=============================================="
 echo
 
-INTERFACES_FILE="/etc/network/interfaces"
-BACKUP_FILE="/etc/network/interfaces.bkp-$(date +%Y%m%d-%H%M%S)"
-
 if [ "$EUID" -ne 0 ]; then
     echo "❌ Execute como root: sudo bash $0"
     exit 1
@@ -42,34 +39,16 @@ if [ -z "$IP" ] || [ -z "$CIDR" ] || [ -z "$GATEWAY" ] || [ -z "$DNS1" ]; then
     exit 1
 fi
 
-# Converte CIDR para netmask
-prefix_to_netmask() {
-    local prefix=$1
-    local mask=""
-    for i in $(seq 1 4); do
-        if [ "$prefix" -ge 8 ]; then
-            mask="${mask}255"
-            prefix=$((prefix - 8))
-        elif [ "$prefix" -gt 0 ]; then
-            mask="${mask}$(( 256 - (1 << (8 - prefix)) ))"
-            prefix=0
-        else
-            mask="${mask}0"
-        fi
-        [ "$i" -lt 4 ] && mask="${mask}."
-    done
-    echo "$mask"
-}
-
-NETMASK=$(prefix_to_netmask "$CIDR")
+DNS_LIST="$DNS1"
+[ -n "$DNS2" ] && DNS_LIST="$DNS1,$DNS2"
 
 echo
 echo "=============================================="
 echo "  📋 Resumo da configuracao:"
 echo "  Interface : $IFACE"
-echo "  IP        : $IP/$CIDR ($NETMASK)"
+echo "  IP        : $IP/$CIDR"
 echo "  Gateway   : $GATEWAY"
-echo "  DNS       : $DNS1 $DNS2"
+echo "  DNS       : $DNS_LIST"
 echo "=============================================="
 echo
 read -r -p "Aplicar esta configuracao? [s/N]: " CONFIRM
@@ -79,12 +58,68 @@ if [ "$CONFIRM" != "s" ] && [ "$CONFIRM" != "S" ]; then
     exit 0
 fi
 
-echo
-echo "=== ➡️ Criando backup: $BACKUP_FILE ==="
-cp "$INTERFACES_FILE" "$BACKUP_FILE"
+USAR_NM=false
+if systemctl is-active NetworkManager &>/dev/null; then
+    USAR_NM=true
+    echo
+    echo "=== ➡️ NetworkManager detectado ==="
 
-echo "=== ➡️ Escrevendo nova configuracao de rede ==="
-cat > "$INTERFACES_FILE" <<EOF
+    CONN_NAME=$(nmcli -t -f NAME,DEVICE connection show --active 2>/dev/null | grep ":$IFACE$" | head -1 | cut -d: -f1)
+    if [ -z "$CONN_NAME" ]; then
+        echo "=== ➡️ Conexoes disponiveis no NetworkManager ==="
+        nmcli -t -f NAME,DEVICE connection show 2>/dev/null | awk -F: '{print "   "$1"  (dispositivo: "$2")"}'
+        echo
+        read -r -p "Nome da conexao para '$IFACE': " CONN_NAME
+    fi
+
+    if [ -z "$CONN_NAME" ]; then
+        echo "❌ Nome da conexao nao informado."
+        exit 1
+    fi
+
+    echo "=== ➡️ Configurando IP fixo via NetworkManager ==="
+    nmcli connection modify "$CONN_NAME" \
+        ipv4.method manual \
+        ipv4.addresses "$IP/$CIDR" \
+        ipv4.gateway "$GATEWAY" \
+        ipv4.dns "$DNS_LIST" \
+        ipv4.ignore-auto-dns yes
+
+    echo "=== ➡️ Aplicando a nova configuracao ==="
+    nmcli connection down "$CONN_NAME" 2>/dev/null || true
+    nmcli connection up "$CONN_NAME"
+else
+    echo
+    echo "=== ➡️ NetworkManager nao detectado, usando /etc/network/interfaces ==="
+
+    # Converte CIDR para netmask
+    prefix_to_netmask() {
+        local prefix=$1
+        local mask=""
+        for i in 1 2 3 4; do
+            if [ "$prefix" -ge 8 ]; then
+                mask="${mask}255"
+                prefix=$((prefix - 8))
+            elif [ "$prefix" -gt 0 ]; then
+                mask="${mask}$(( 256 - (1 << (8 - prefix)) ))"
+                prefix=0
+            else
+                mask="${mask}0"
+            fi
+            [ "$i" -lt 4 ] && mask="${mask}."
+        done
+        echo "$mask"
+    }
+    NETMASK=$(prefix_to_netmask "$CIDR")
+
+    INTERFACES_FILE="/etc/network/interfaces"
+    BACKUP_FILE="/etc/network/interfaces.bkp-$(date +%Y%m%d-%H%M%S)"
+
+    echo "=== ➡️ Criando backup: $BACKUP_FILE ==="
+    cp "$INTERFACES_FILE" "$BACKUP_FILE"
+
+    echo "=== ➡️ Escrevendo nova configuracao de rede ==="
+    cat > "$INTERFACES_FILE" <<EOF
 # Configuracao de IP fixo gerada por ip-fixo.sh
 # Backup em: $BACKUP_FILE
 
@@ -96,20 +131,20 @@ iface $IFACE inet static
     address $IP
     netmask $NETMASK
     gateway $GATEWAY
-    dns-nameservers $DNS1 $DNS2
+    dns-nameservers $DNS_LIST
 EOF
 
-echo
-echo "=== ➡️ Aplicando nova configuracao de rede ==="
-systemctl restart networking || {
-    echo
-    echo "❌ Falha ao reiniciar o servico networking."
-    echo "Restaurando backup..."
-    cp "$BACKUP_FILE" "$INTERFACES_FILE"
-    systemctl restart networking
-    echo "✅ Backup restaurado."
-    exit 1
-}
+    echo "=== ➡️ Aplicando nova configuracao de rede ==="
+    systemctl restart networking || {
+        echo
+        echo "❌ Falha ao reiniciar o servico networking."
+        echo "Restaurando backup..."
+        cp "$BACKUP_FILE" "$INTERFACES_FILE"
+        systemctl restart networking
+        echo "✅ Backup restaurado."
+        exit 1
+    }
+fi
 
 echo
 echo "=============================================="
@@ -117,9 +152,5 @@ echo "✅ IP fixo configurado com sucesso!"
 echo "   Interface : $IFACE"
 echo "   IP        : $IP/$CIDR"
 echo "   Gateway   : $GATEWAY"
-echo "   DNS       : $DNS1 ${DNS2:-}"
-echo "   Backup    : $BACKUP_FILE"
-echo
-echo "⚠️  Se o sistema usar NetworkManager, execute:"
-echo "   sudo nmcli device set $IFACE managed no"
+echo "   DNS       : $DNS_LIST"
 echo "=============================================="
