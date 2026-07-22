@@ -2,6 +2,25 @@
 
 ---
 
+## Inicio rapido
+
+Execute os scripts na ordem abaixo:
+
+```bash
+# 1. Configurar IP fixo no servidor (ex: 192.168.1.10)
+sudo bash ../ip-fixo.sh
+
+# 2. Instalar o Bind9
+sudo bash dns.sh
+
+# 3. Configurar o dominio DNS
+sudo bash dns-setup.sh
+```
+
+O script `dns-setup.sh` e interativo e faz backup automatico de todas as configuracoes.
+
+---
+
 ## 1. Configurar IP fixo no servidor
 
 ### Via script (recomendado)
@@ -10,13 +29,32 @@
 sudo bash ../ip-fixo.sh
 ```
 
-O script faz backup automatico, configura a interface e reinicia o servico `networking`.
+O script detecta automaticamente se o sistema usa **NetworkManager** (padrao Debian 13) ou `/etc/network/interfaces` (Debian antigo) e configura o IP fixo de acordo.
+
+---
+
+### Manualmente via NetworkManager (nmcli)
+
+```bash
+# Listar conexoes
+nmcli connection show
+
+# Configurar IP fixo (ex: "Wired connection 1")
+nmcli connection modify "Wired connection 1" \
+    ipv4.method manual \
+    ipv4.addresses "192.168.1.10/24" \
+    ipv4.gateway "192.168.1.1" \
+    ipv4.dns "8.8.8.8,8.8.4.4" \
+    ipv4.ignore-auto-dns yes
+
+# Aplicar
+nmcli connection down "Wired connection 1"
+nmcli connection up "Wired connection 1"
+```
 
 ---
 
 ### Manualmente via /etc/network/interfaces
-
-Caso prefira configurar manualmente, edite `/etc/network/interfaces`:
 
 ```
 auto enp0s3
@@ -26,8 +64,6 @@ iface enp0s3 inet static
     gateway 192.168.1.1
     dns-nameservers 8.8.8.8 8.8.4.4
 ```
-
-Reinicie o servico de rede:
 
 ```bash
 sudo systemctl restart networking
@@ -75,9 +111,38 @@ ping -c 3 8.8.8.8
 
 ---
 
-## 2. Configurar o Bind9
+## 2. Instalar o Bind9
 
-### Arquivos principais
+```bash
+sudo bash dns.sh
+```
+
+O script instala `bind9`, `bind9utils` e `bind9-doc`, detecta o nome correto do servico (`bind9` ou `named`) e habilita a inicializacao automatica.
+
+---
+
+## 3. Configurar o dominio DNS
+
+### Via script (recomendado)
+
+```bash
+sudo bash dns-setup.sh
+```
+
+O script faz:
+
+- **Backup** dos arquivos em `/etc/bind/backup-YYYYMMDD-HHMMSS/`
+- **Configura** `named.conf.options` com forwarders (`8.8.8.8`), `listen-on { any; }` e `allow-query { any; }`
+- **Adiciona** a zona ao `named.conf.local`
+- **Cria** o arquivo de zona com registros `@`, `ns` e `www`
+- **Valida** com `named-checkconf` e `named-checkzone`
+- **Recarrega** o servico e **testa** com `dig`
+
+---
+
+### Manualmente (passo a passo)
+
+#### Arquivos principais
 
 | Arquivo | Funcao |
 |---|---|
@@ -85,9 +150,7 @@ ping -c 3 8.8.8.8
 | `/etc/bind/named.conf.local` | Declaracao das zonas de dominio |
 | `/etc/bind/named.conf.default-zones` | Zonas padrao (localhost, etc.) |
 
----
-
-### 2.1. Forwarders e escuta
+#### Forwarders e escuta
 
 Edite `/etc/bind/named.conf.options`:
 
@@ -107,9 +170,7 @@ options {
 };
 ```
 
----
-
-### 2.2. Criar uma zona de dominio
+#### Criar uma zona de dominio
 
 Edite `/etc/bind/named.conf.local` e adicione:
 
@@ -120,9 +181,7 @@ zone "meudominio.local" {
 };
 ```
 
----
-
-### 2.3. Criar o arquivo de zona
+#### Criar o arquivo de zona
 
 Crie `/etc/bind/db.meudominio.local`:
 
@@ -142,33 +201,20 @@ ns      IN      A       192.168.1.10
 www     IN      A       192.168.1.10
 ```
 
----
-
-### 2.4. Testar e aplicar
+#### Testar e aplicar
 
 ```bash
-# Verificar sintaxe da configuracao
 sudo named-checkconf
-
-# Verificar sintaxe da zona
 sudo named-checkzone meudominio.local /etc/bind/db.meudominio.local
-
-# Recarregar o servico
 sudo systemctl reload bind9    # ou 'named'
-```
 
----
-
-### 2.5. Testar resolucao
-
-```bash
 dig @127.0.0.1 www.meudominio.local
 nslookup www.meudominio.local 127.0.0.1
 ```
 
 ---
 
-## 3. Configurar clientes
+## 4. Configurar clientes
 
 Nos clientes da rede, aponte o DNS para o IP do servidor (`192.168.1.10`).
 
@@ -193,7 +239,7 @@ nmcli connection up "Wired connection 1"
 
 ---
 
-## 4. Firewall
+## 5. Firewall
 
 Libere a porta 53 se houver firewall ativo:
 
@@ -205,7 +251,7 @@ sudo ufw reload
 
 ---
 
-## 5. Comandos uteis
+## 6. Comandos uteis
 
 | Comando | Descricao |
 |---|---|
@@ -220,11 +266,23 @@ sudo ufw reload
 
 ---
 
-## 6. Logs
+## 7. Logs
 
 Os logs do Bind9 ficam em:
 
 ```bash
 sudo journalctl -u bind9     # systemd
 /var/log/syslog              # syslog
+```
+
+---
+
+## 8. Restaurar backup
+
+Em caso de erro, os backups ficam em:
+
+```bash
+ls /etc/bind/backup-*/
+sudo cp /etc/bind/backup-*/* /etc/bind/
+sudo systemctl restart bind9
 ```
