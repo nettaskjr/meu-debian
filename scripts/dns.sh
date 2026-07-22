@@ -11,14 +11,21 @@ sudo apt upgrade -y
 echo "=== ➡️ Instalando $appNome ==="
 sudo apt install -y bind9 bind9utils bind9-doc
 
+SERVICO="bind9"
+echo "=== ➡️ Detectando nome do servico ==="
+if systemctl list-unit-files | grep -q "^named.service"; then
+    SERVICO="named"
+fi
+echo "Serviço detectado: $SERVICO"
+
 echo "=== ➡️ Habilitando Bind9 na inicializacão ==="
-sudo systemctl enable bind9
-sudo systemctl start bind9
+sudo systemctl enable "$SERVICO"
+sudo systemctl start "$SERVICO"
 
 echo
 echo "=============================================="
 echo "Status do Bind9:"
-sudo systemctl status bind9 --no-pager || true
+sudo systemctl status "$SERVICO" --no-pager || true
 echo
 echo "✅ $appNome instalado com sucesso!"
 echo
