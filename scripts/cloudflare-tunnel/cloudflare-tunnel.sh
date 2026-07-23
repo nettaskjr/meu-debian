@@ -216,12 +216,24 @@ echo "=== ➡️ Criando registros DNS ==="
 for srv in "${CLOUDFLARED_SERVICES[@]}"; do
     IFS='|' read -r proto host port <<< "$srv"
     echo "   DNS: $host -> tunel $TUNNEL_NAME"
-    cloudflared tunnel route dns "$TUNNEL_NAME" "$host" 2>/dev/null || \
-        echo "   ⚠️  Registro DNS para $host pode ja existir ou falhou."
+    if cloudflared tunnel route dns --overwrite-dns "$TUNNEL_NAME" "$host" 2>&1; then
+        echo "   ✅ Registro DNS criado: $host"
+    else
+        echo "   ❌ Falha ao criar registro DNS para $host."
+        echo "      Execute manualmente:"
+        echo "      cloudflared tunnel route dns $TUNNEL_NAME $host"
+    fi
 done
 
 # ============================================================
-# 9. INSTALAR COMO SERVICO SYSTEMD
+# 9. VERIFICAR REGISTROS DNS
+# ============================================================
+echo
+echo "=== ➡️ Verificando registros DNS no Cloudflare ==="
+cloudflared tunnel route list 2>/dev/null || echo "   ⚠️  Nao foi possivel listar rotas."
+
+# ============================================================
+# 10. INSTALAR COMO SERVICO SYSTEMD
 # ============================================================
 echo
 echo "=== ➡️ Instalando servico systemd ==="
@@ -230,7 +242,30 @@ systemctl enable cloudflared
 systemctl restart cloudflared
 
 # ============================================================
-# 10. SEGURANCA - FIREWALL E BIND LOCALHOST
+# 11. VERIFICAR SE O TUNEL ESTA ATIVO
+# ============================================================
+echo
+echo "=== ➡️ Verificando status do tunel ==="
+sleep 2
+if systemctl is-active --quiet cloudflared; then
+    echo "✅ Servico cloudflared: ATIVO"
+else
+    echo "❌ Servico cloudflared: INATIVO"
+    echo "   Logs: journalctl -u cloudflared -n 30"
+fi
+
+# Mostrar logs recentes se houver erro
+if ! cloudflared tunnel info "$TUNNEL_NAME" 2>/dev/null | grep -q "ACTIVE"; then
+    echo
+    echo "⚠️  Tunel pode nao estar ativo na Cloudflare."
+    echo "   Verifique com:"
+    echo "   cloudflared tunnel info $TUNNEL_NAME"
+    echo "   cloudflared tunnel route list"
+    echo "   journalctl -u cloudflared -n 50"
+fi
+
+# ============================================================
+# 12. SEGURANCA - FIREWALL E BIND LOCALHOST
 # ============================================================
 echo
 echo "=== ➡️ Reforcando seguranca local ==="
@@ -257,7 +292,7 @@ echo "   - Web/App: configure bind para 127.0.0.1 em vez de 0.0.0.0"
 echo
 
 # ============================================================
-# 11. CLOUDFLARE ACCESS (se token informado)
+# 13. CLOUDFLARE ACCESS (se token informado)
 # ============================================================
 if [ -n "$API_TOKEN" ]; then
     echo "=== ➡️ Configurando Cloudflare Access (Zero Trust) ==="
@@ -405,17 +440,33 @@ else
 fi
 
 # ============================================================
-# 12. VERIFICACAO FINAL
+# 14. VERIFICACAO FINAL
 # ============================================================
 echo
 echo "=============================================="
 echo "  📊 Status do Tunel"
 echo "=============================================="
 echo
-cloudflared tunnel info "$TUNNEL_NAME"
-echo
 
-echo "✅ $appNome configurado com sucesso!"
+echo "--- cloudflared tunnel info ---"
+cloudflared tunnel info "$TUNNEL_NAME" 2>&1 || echo "   ⚠️  Falha ao obter info do tunel."
+
+echo
+echo "--- cloudflared tunnel route list ---"
+cloudflared tunnel route list 2>&1 || echo "   ⚠️  Falha ao listar rotas DNS."
+
+echo
+echo "--- systemctl status cloudflared ---"
+systemctl is-active cloudflared && echo "   Servico: ATIVO" || echo "   Servico: INATIVO"
+
+echo
+echo "--- Ultimos logs do cloudflared ---"
+journalctl -u cloudflared --no-pager -n 10 2>/dev/null || echo "   Nao foi possivel ler os logs."
+
+echo
+echo "=============================================="
+echo "  ✅ $appNome configurado!"
+echo "=============================================="
 echo
 echo "   Tunel      : $TUNNEL_NAME"
 echo "   Dominio    : $DOMINIO"
@@ -427,9 +478,14 @@ for srv in "${CLOUDFLARED_SERVICES[@]}"; do
     echo "      https://$host -> localhost:$port"
 done
 echo
-echo "   📝 Comandos uteis:"
+echo "   🔍 Verifique o status no dashboard:"
+echo "      https://one.dash.cloudflare.com/"
+echo "      Va em: Zero Trust > Networks > Tunnels"
+echo
+echo "   📝 Comandos para diagnostico:"
 echo "      cloudflared tunnel list"
 echo "      cloudflared tunnel info $TUNNEL_NAME"
+echo "      cloudflared tunnel route list"
 echo "      systemctl status cloudflared"
 echo "      journalctl -u cloudflared -f"
 echo
