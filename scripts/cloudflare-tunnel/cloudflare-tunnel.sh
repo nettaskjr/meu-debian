@@ -252,6 +252,11 @@ configure_access() {
     echo
     echo "=== ➡️ Cloudflare Access (Zero Trust) ==="
 
+    # Salvar token para uso futuro (ex: exclusao)
+    mkdir -p "$HOME/.cloudflared"
+    echo "$api_token" > "$HOME/.cloudflared/access_token"
+    chmod 600 "$HOME/.cloudflared/access_token"
+
     ACCOUNT_ID=$(curl -s https://api.cloudflare.com/client/v4/accounts \
         -H "Authorization: Bearer $api_token" \
         -H "Content-Type: application/json" | \
@@ -339,40 +344,100 @@ delete_everything() {
     read -r -p "Digite 'DELETAR' para confirmar: " CONFIRM
     [ "$CONFIRM" != "DELETAR" ] && { echo "Cancelado."; return; }
 
-    local tunnels
-    tunnels=$(get_all_tunnels)
-    if [ -z "$tunnels" ]; then
-        echo "Nenhum tunel encontrado."
+    # --- Parar servico primeiro ---
+    echo
+    echo "=> Parando servico cloudflared..."
+    systemctl stop cloudflared 2>/dev/null || true
+    systemctl disable cloudflared 2>/dev/null || true
+
+    # --- Obter dados dos tuneis (JSON) ---
+    local tunnels_json
+    tunnels_json=$(cloudflared tunnel list --output json 2>/dev/null || echo "[]")
+
+    local tunnel_count
+    tunnel_count=$(echo "$tunnels_json" | python3 -c "import sys,json;print(len(json.load(sys.stdin)))" 2>/dev/null || echo "0")
+
+    if [ "$tunnel_count" -eq 0 ]; then
+        echo "Nenhum tunel encontrado no Cloudflare."
     else
-        echo "Tuneis que serao excluidos:"
-        echo "$tunnels" | while IFS='|' read -r id name status; do
-            echo "   - $name ($id)"
-        done
-        echo "$tunnels" | while IFS='|' read -r id name status; do
-            echo "=> Excluindo tunel: $name ($id)"
+        echo "Tuneis encontrados: $tunnel_count"
+        echo "$tunnels_json" | python3 -c "
+import sys, json
+tunnels = json.load(sys.stdin)
+for t in tunnels:
+    print(f\"{t['id']}|{t['name']}\")
+" 2>/dev/null | while IFS='|' read -r tid tname; do
+            echo
+            echo "=== ➡️ Excluindo tunel: $tname ($tid) ==="
 
-            # Deletar rotas DNS
             echo "   Removendo rotas DNS..."
-            cloudflared tunnel route list 2>/dev/null | grep "$id" | while read -r line; do
-                cname=$(echo "$line" | awk '{print $4}')
-                [ -n "$cname" ] && cloudflared tunnel route delete "$id" "$cname" 2>/dev/null || true
-            done || true
+            cloudflared tunnel route list --output json 2>/dev/null | python3 -c "
+import sys, json
+routes = json.load(sys.stdin)
+for r in routes:
+    if r.get('tunnel_id') == '$tid' or r.get('tunnel_name') == '$tname':
+        print(r.get('value', r.get('dns_name', '')))
+" 2>/dev/null | while read -r hostname; do
+                if [ -n "$hostname" ]; then
+                    echo "   -> $hostname"
+                    cloudflared tunnel route delete "$tid" "$hostname" 2>/dev/null || \
+                    cloudflared tunnel route delete -f "$tid" "$hostname" 2>/dev/null || \
+                    echo "   ⚠️  Nao foi possivel deletar rota: $hostname"
+                fi
+            done
+            echo "   Rotas DNS removidas."
 
-            # Excluir tunel
-            cloudflared tunnel delete -f "$id" 2>/dev/null || true
-            echo "   ✅ Tunel '$name' excluido."
+            # --- Deletar o tunel ---
+            echo "   Excluindo tunnel..."
+            if cloudflared tunnel delete -f "$tid" 2>&1; then
+                echo "   ✅ Tunel '$tname' excluido do Cloudflare."
+            else
+                echo "   ⚠️  Falha ao excluir tunel '$tname'."
+                echo "   Tente manualmente: cloudflared tunnel delete $tid"
+            fi
         done
     fi
 
-    # Parar e remover servico
+    # --- Deletar Access Apps via API (se token foi usado) ---
+    if [ -f "$HOME/.cloudflared/access_token" ]; then
+        local saved_token
+        saved_token=$(cat "$HOME/.cloudflared/access_token" 2>/dev/null || true)
+    fi
+    if [ -n "${saved_token:-}" ]; then
+        echo
+        echo "=== ➡️ Removendo Cloudflare Access Apps ==="
+        local acct_id
+        acct_id=$(curl -s https://api.cloudflare.com/client/v4/accounts \
+            -H "Authorization: Bearer $saved_token" \
+            -H "Content-Type: application/json" | \
+            grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
+
+        if [ -n "$acct_id" ]; then
+            curl -s "https://api.cloudflare.com/client/v4/accounts/$acct_id/access/apps" \
+                -H "Authorization: Bearer $saved_token" \
+                -H "Content-Type: application/json" | \
+                python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+for app in data.get('result', []):
+    print(app['id'])
+" 2>/dev/null | while read -r app_id; do
+                [ -n "$app_id" ] && curl -s -X DELETE \
+                    "https://api.cloudflare.com/client/v4/accounts/$acct_id/access/apps/$app_id" \
+                    -H "Authorization: Bearer $saved_token" > /dev/null && \
+                    echo "   Access App $app_id removido."
+            done
+            echo "   Access Apps removidos."
+        fi
+    fi
+
+    # --- Limpeza local ---
     echo
     echo "=> Removendo servico systemd..."
-    systemctl stop cloudflared 2>/dev/null || true
-    systemctl disable cloudflared 2>/dev/null || true
     rm -f /etc/systemd/system/cloudflared*.service
+    rm -f /lib/systemd/system/cloudflared*.service
     systemctl daemon-reload 2>/dev/null || true
 
-    # Remover configuracao
     echo "=> Removendo arquivos de configuracao..."
     rm -rf "$HOME/.cloudflared" 2>/dev/null || true
 
@@ -384,6 +449,14 @@ delete_everything() {
         echo "   cloudflared removido."
     fi
 
+    # --- Verificacao ---
+    echo
+    echo "=== ➡️ Verificando cleanup ==="
+    echo "Tuneis restantes:"
+    cloudflared tunnel list 2>/dev/null || echo "   Nenhum (ou cloudflared ja removido)."
+    echo
+    echo "Rotas DNS restantes:"
+    cloudflared tunnel route list 2>/dev/null || echo "   Nenhuma (ou cloudflared ja removido)."
     echo
     echo "✅ Tudo excluido."
 }
@@ -417,6 +490,13 @@ while true; do
 
             echo
             read -r -p "API Token Cloudflare para Access/Zero Trust (ou Enter para pular): " API_TOKEN
+
+            # Salvar token para uso futuro
+            if [ -n "$API_TOKEN" ]; then
+                mkdir -p "$HOME/.cloudflared"
+                echo "$API_TOKEN" > "$HOME/.cloudflared/access_token"
+                chmod 600 "$HOME/.cloudflared/access_token"
+            fi
 
             # 1. Instalar cloudflared
             if ! command -v cloudflared &>/dev/null; then
