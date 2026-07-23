@@ -229,20 +229,30 @@ install_service() {
 
 configure_firewall() {
     echo
-    echo "=== ➡️ Firewall ==="
-    if ! command -v ufw &>/dev/null; then
-        echo "   ufw nao encontrado, pulando."
-        return
-    fi
-    echo "   Bloqueando acesso externo as portas dos servicos:"
+    echo "=== ➡️ Seguranca dos servicos ==="
+    echo
+    echo "   ⚠️  IMPORTANTE: Configure cada servico para escutar APENAS localhost."
+    echo "   Isso impede acesso direto pela rede. O tunel Cloudflare fara o acesso."
+    echo
+    echo "   Exemplos de configuracao:"
+    echo
+    echo "   SSH:"
+    echo "     Edite /etc/ssh/sshd_config:"
+    echo "       ListenAddress 127.0.0.1"
+    echo "     sudo systemctl restart sshd"
+    echo
+
     for srv in "${CLOUDFLARED_SERVICES[@]}"; do
         IFS='|' read -r proto host port <<< "$srv"
-        sudo ufw deny "$port/tcp" 2>/dev/null || true
-        echo "   Porta $port bloqueada."
+        echo "   $proto (porta $port):"
+        echo "     Verifique se o servico escuta em 127.0.0.1, nao 0.0.0.0"
+        echo "     Teste: ss -tlnp | grep :$port"
+        echo
     done
-    sudo ufw reload 2>/dev/null || true
-    echo
-    echo "   ⚠️  Configure cada servico para escutar apenas localhost."
+
+    echo "   ❌ NAO use 'ufw deny' nas portas dos servicos."
+    echo "   Isso bloquearia o proprio cloudflared de acessa-los via localhost."
+    echo "   O bind em 127.0.0.1 ja e suficiente."
 }
 
 configure_access() {
