@@ -637,9 +637,56 @@ while true; do
             echo "   🌐 Servicos:"
             for srv in "${CLOUDFLARED_SERVICES[@]}"; do
                 IFS='|' read -r proto host port <<< "$srv"
-                echo "      https://$host -> localhost:$port"
+                echo "      https://$host -> $proto://localhost:$port"
             done
             echo
+            echo "=============================================="
+            echo "  💻 Como acessar da maquina cliente"
+            echo "=============================================="
+            echo
+            for srv in "${CLOUDFLARED_SERVICES[@]}"; do
+                IFS='|' read -r proto host port <<< "$srv"
+                case "$proto" in
+                    http|https)
+                        echo "   🌍 $host"
+                        echo "      Acesse direto no navegador: https://$host"
+                        echo
+                        ;;
+                    ssh)
+                        echo "   🔑 $host (SSH)"
+                        echo "      Instale o cloudflared na maquina cliente:"
+                        echo "      https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/"
+                        echo
+                        echo "      Acesse via:"
+                        echo "      cloudflared access ssh --hostname $host"
+                        echo
+                        echo "      Ou adicione ao ~/.ssh/config:"
+                        echo "      Host $host"
+                        echo "          ProxyCommand cloudflared access ssh --hostname %h"
+                        echo
+                        ;;
+                    rdp)
+                        echo "   🖥️  $host (RDP)"
+                        echo "      Instale o cloudflared na maquina cliente:"
+                        echo "      https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/"
+                        echo
+                        echo "      Acesse via:"
+                        echo "      cloudflared access rdp --hostname $host --url localhost:3389"
+                        echo "      Depois conecte seu cliente RDP em: localhost:3389"
+                        echo
+                        ;;
+                    tcp)
+                        echo "   🔗 $host (TCP)"
+                        echo "      Instale o cloudflared na maquina cliente."
+                        echo
+                        echo "      Acesse via:"
+                        echo "      cloudflared access tcp --hostname $host --url localhost:$port"
+                        echo "      Depois conecte seu cliente em: localhost:$port"
+                        echo
+                        ;;
+                esac
+            done
+            echo "=============================================="
             echo "   🔍 Dashboard: https://one.dash.cloudflare.com/"
             echo "      Zero Trust > Networks > Tunnels"
             echo "=============================================="
