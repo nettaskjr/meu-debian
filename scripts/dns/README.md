@@ -144,11 +144,11 @@ O script faz:
 
 #### Arquivos principais
 
-| Arquivo | Funcao |
-|---|---|
+| Arquivo                          | Funcao                                        |
+| -------------------------------- | --------------------------------------------- |
 | `/etc/bind/named.conf.options` | Opcoes globais (forwarders, interfaces, etc.) |
-| `/etc/bind/named.conf.local` | Declaracao das zonas de dominio |
-| `/etc/bind/named.conf.default-zones` | Zonas padrao (localhost, etc.) |
+| `/etc/bind/named.conf.local`   | Declaracao das zonas de dominio               |
+
 
 #### Forwarders e escuta
 
@@ -253,16 +253,16 @@ sudo ufw reload
 
 ## 6. Comandos uteis
 
-| Comando | Descricao |
-|---|---|
-| `sudo systemctl status bind9` | Status do servico (ou `named`) |
-| `sudo systemctl restart bind9` | Reiniciar |
-| `sudo systemctl reload bind9` | Recarregar configuracao |
-| `sudo named-checkconf` | Validar sintaxe dos arquivos de configuracao |
-| `sudo named-checkzone meudominio.local /etc/bind/db.meudominio.local` | Validar sintaxe de uma zona |
-| `sudo journalctl -u bind9 -f` | Logs em tempo real |
-| `dig @127.0.0.1 dominio.local` | Testar resolucao local |
-| `nslookup dominio.local` | Testar resolucao |
+| Comando                                                                 | Descricao                                    |
+| ----------------------------------------------------------------------- | -------------------------------------------- |
+| `sudo systemctl status bind9`                                         | Status do servico (ou`named`)              |
+| `sudo systemctl restart bind9`                                        | Reiniciar                                    |
+| `sudo systemctl reload bind9`                                         | Recarregar configuracao                      |
+| `sudo named-checkconf`                                                | Validar sintaxe dos arquivos de configuracao |
+| `sudo named-checkzone meudominio.local /etc/bind/db.meudominio.local` | Validar sintaxe de uma zona                  |
+| `sudo journalctl -u bind9 -f`                                         | Logs em tempo real                           |
+| `dig @127.0.0.1 dominio.local`                                        | Testar resolucao local                       |
+| `nslookup dominio.local`                                              | Testar resolucao                             |
 
 ---
 
