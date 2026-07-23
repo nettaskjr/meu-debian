@@ -39,6 +39,12 @@ if [ -z "$IP" ] || [ -z "$CIDR" ] || [ -z "$GATEWAY" ] || [ -z "$DNS1" ]; then
     exit 1
 fi
 
+HOSTNAME_ATUAL=$(hostname --short 2>/dev/null || cat /etc/hostname 2>/dev/null)
+echo
+echo "Hostname atual: $HOSTNAME_ATUAL"
+read -r -p "Nome do host (deixe em branco para manter): " HOSTNAME_INPUT
+HOSTNAME="${HOSTNAME_INPUT:-$HOSTNAME_ATUAL}"
+
 DNS_LIST="$DNS1"
 [ -n "$DNS2" ] && DNS_LIST="$DNS1,$DNS2"
 
@@ -49,6 +55,7 @@ echo "  Interface : $IFACE"
 echo "  IP        : $IP/$CIDR"
 echo "  Gateway   : $GATEWAY"
 echo "  DNS       : $DNS_LIST"
+echo "  Hostname  : $HOSTNAME"
 echo "=============================================="
 echo
 read -r -p "Aplicar esta configuracao? [s/N]: " CONFIRM
@@ -146,6 +153,29 @@ EOF
     }
 fi
 
+# --- Configurar hostname e /etc/hosts ---
+HOSTS_FILE="/etc/hosts"
+HOSTS_BKP="/etc/hosts.bkp-$(date +%Y%m%d-%H%M%S)"
+
+echo
+echo "=== ➡️ Configurando hostname: $HOSTNAME ==="
+hostnamectl set-hostname "$HOSTNAME"
+
+echo "=== ➡️ Atualizando $HOSTS_FILE ==="
+cp "$HOSTS_FILE" "$HOSTS_BKP"
+echo "   Backup: $HOSTS_BKP"
+
+# Remove entradas antigas do 127.0.1.1 (tipico de DHCP)
+sed -i '/^127\.0\.1\.1/d' "$HOSTS_FILE"
+
+# Adiciona o IP estatico com hostname se ainda nao existir
+if ! grep -q "^$IP\s.*$HOSTNAME" "$HOSTS_FILE"; then
+    echo "$IP    $HOSTNAME" >> "$HOSTS_FILE"
+    echo "   Adicionado: $IP $HOSTNAME"
+else
+    echo "   Entrada $IP $HOSTNAME ja existe"
+fi
+
 echo
 echo "=============================================="
 echo "✅ IP fixo configurado com sucesso!"
@@ -153,4 +183,5 @@ echo "   Interface : $IFACE"
 echo "   IP        : $IP/$CIDR"
 echo "   Gateway   : $GATEWAY"
 echo "   DNS       : $DNS_LIST"
+echo "   Hostname  : $HOSTNAME"
 echo "=============================================="
