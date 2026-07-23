@@ -3,493 +3,542 @@ set -e
 
 appNome="Cloudflare Tunnel"
 
-echo "=============================================="
-echo "  🔧 $appNome"
-echo "=============================================="
-echo
-
 if [ "$EUID" -ne 0 ]; then
     echo "❌ Execute como root: sudo bash $0"
     exit 1
 fi
 
-# ============================================================
-# 1. PRE-REQUISITOS
-# ============================================================
-echo "=== ➡️ Verificando pre-requisitos ==="
-command -v curl &>/dev/null || { echo "❌ curl nao encontrado. Instale com: sudo apt install -y curl"; exit 1; }
-echo "✅ curl OK"
+command -v curl &>/dev/null || { echo "❌ Instale curl: sudo apt install -y curl"; exit 1; }
 
 # ============================================================
-# 2. PERGUNTAR DADOS INICIAIS
+# FUNCOES AUXILIARES
 # ============================================================
-read -r -p "Dominio configurado no Cloudflare (ex: meudominio.com): " DOMINIO
-if [ -z "$DOMINIO" ]; then
-    echo "❌ Dominio nao informado."
-    exit 1
-fi
 
-echo
-echo "Para o Cloudflare Access, voce precisa de um API Token."
-echo "Crie um em: https://dash.cloudflare.com/profile/api-tokens"
-echo "Permissoes minimas:"
-echo "  - Account:Cloudflare Tunnel:Edit"
-echo "  - Zone:DNS:Edit"
-echo "  - Account:Access:Edit"
-echo
-read -r -p "API Token (deixe em branco para pular Access): " API_TOKEN
+install_cloudflared() {
+    echo
+    echo "=== ➡️ Instalando cloudflared ==="
 
-# Nome do tunel
-read -r -p "Nome do tunel (padrao: homelab): " TUNNEL_NAME
-TUNNEL_NAME="${TUNNEL_NAME:-homelab}"
-
-# ============================================================
-# 3. INSTALAR CLOUDFLARED
-# ============================================================
-echo
-echo "=== ➡️ Instalando cloudflared ==="
-
-if ! command -v cloudflared &>/dev/null; then
     CODENAME=$(lsb_release -cs)
     echo "   Codename detectado: $CODENAME"
 
-    SUPPORTED="bookworm bullseye jammy noble"
+    # Remove repo antigo se existir (pode ter codename errado)
+    if [ -f /etc/apt/sources.list.d/cloudflared.list ]; then
+        echo "   Removendo repo antigo..."
+        rm -f /etc/apt/sources.list.d/cloudflared.list
+    fi
+
+    # Mapeamento: quais codenames o cloudflare suporta
+    SUPPORTED="bookworm bullseye jammy noble focal"
     if echo "$SUPPORTED" | grep -qw "$CODENAME"; then
         REPO_CODENAME="$CODENAME"
-    elif grep -q "bookworm" /etc/apt/sources.list /etc/apt/sources.list.d/*.list 2>/dev/null; then
-        REPO_CODENAME="bookworm"
     else
-        # Fallback: tenta bookworm (Debian 12) como compatível
+        # Fallback: bookworm é compatível com trixie/sid/etc
         REPO_CODENAME="bookworm"
+        echo "   Codename '$CODENAME' nao suportado. Fallback: $REPO_CODENAME"
     fi
 
-    echo "   Usando repositorio: $REPO_CODENAME"
     curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg | \
-        sudo gpg --dearmor -o /usr/share/keyrings/cloudflare-main.gpg
+        sudo gpg --dearmor -o /usr/share/keyrings/cloudflare-main.gpg 2>/dev/null
+
     echo "deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared $REPO_CODENAME main" | \
         sudo tee /etc/apt/sources.list.d/cloudflared.list > /dev/null
+
     sudo apt update -y
     sudo apt install -y cloudflared
-else
-    echo "   cloudflared ja instalado."
-fi
 
-CLOUDFLARED_VERSION=$(cloudflared version 2>/dev/null | head -1)
-echo "✅ cloudflared $CLOUDFLARED_VERSION"
-
-# ============================================================
-# 4. AUTENTICAR
-# ============================================================
-echo
-echo "=== ➡️ Autenticando no Cloudflare ==="
-echo "   Um navegador sera aberto para fazer login."
-echo "   Se nao abrir, copie a URL exibida abaixo."
-echo
-
-cloudflared tunnel login
-
-# ============================================================
-# 5. CRIAR O TUNEL
-# ============================================================
-echo
-echo "=== ➡️ Criando tunel: $TUNNEL_NAME ==="
-
-if cloudflared tunnel list | grep -q "$TUNNEL_NAME"; then
-    echo "   Tunel '$TUNNEL_NAME' ja existe."
-else
-    cloudflared tunnel create "$TUNNEL_NAME"
-    echo "✅ Tunel '$TUNNEL_NAME' criado."
-fi
-
-TUNNEL_ID=$(cloudflared tunnel list --output json 2>/dev/null | grep -o "\"id\":\"[^\"]*\"" | head -1 | cut -d'"' -f4)
-CREDENTIALS_FILE=$(ls "$HOME/.cloudflared/"*.json 2>/dev/null | head -1)
-
-# ============================================================
-# 6. CONFIGURAR SERVICOS (INTERATIVO)
-# ============================================================
-CONFIG_FILE="$HOME/.cloudflared/config.yml"
-INGRESS_RULES=""
-
-echo
-echo "=============================================="
-echo "  📋 Configurar servicos expostos"
-echo "=============================================="
-
-add_service() {
-    local proto host port
-    read -r -p "   Protocolo (http/tcp/ssh/rdp): " proto
-    read -r -p "   Subdominio (ex: ssh.$DOMINIO): " host
-    read -r -p "   Porta local (ex: 22): " port
-
-    if [ -z "$proto" ] || [ -z "$host" ] || [ -z "$port" ]; then
-        echo "   ⚠️  Dados incompletos, ignorando."
-        return
-    fi
-
-    case "$proto" in
-        ssh)   SERVICE_URL="ssh://localhost:$port" ;;
-        rdp)   SERVICE_URL="rdp://localhost:$port" ;;
-        tcp)   SERVICE_URL="tcp://localhost:$port" ;;
-        http)  SERVICE_URL="http://localhost:$port" ;;
-        https) SERVICE_URL="https://localhost:$port" ;;
-        *)     SERVICE_URL="tcp://localhost:$port" ;;
-    esac
-
-    INGRESS_RULES+="  - hostname: $host
-    service: $SERVICE_URL
-"
-    CLOUDFLARED_SERVICES+=("$proto|$host|$port")
-    echo "   ✅ $host -> $SERVICE_URL"
+    CLOUDFLARED_VERSION=$(cloudflared version 2>/dev/null | head -1)
+    echo "✅ cloudflared $CLOUDFLARED_VERSION"
 }
 
-CLOUDFLARED_SERVICES=()
-while true; do
+authenticate() {
     echo
-    echo "Servicos atuais: ${#CLOUDFLARED_SERVICES[@]}"
-    echo "  1) Adicionar servico"
-    echo "  2) Remover ultimo servico"
-    echo "  3) Concluir configuracao"
-    echo "  4) Cancelar"
-    read -r -p "Opcao [1-4]: " MENU_OPT
+    echo "=== ➡️ Autenticando no Cloudflare ==="
+    echo "   Um navegador sera aberto para fazer login."
+    echo
+    cloudflared tunnel login
+    echo "✅ Autenticado."
+}
 
-    case "$MENU_OPT" in
-        1) add_service ;;
-        2)
-            if [ ${#CLOUDFLARED_SERVICES[@]} -gt 0 ]; then
-                removed="${CLOUDFLARED_SERVICES[-1]}"
-                unset 'CLOUDFLARED_SERVICES[-1]'
-                # Rebuild INGRESS_RULES
-                INGRESS_RULES=""
-                for srv in "${CLOUDFLARED_SERVICES[@]}"; do
-                    IFS='|' read -r p h po <<< "$srv"
-                    case "$p" in
-                        ssh) url="ssh://localhost:$po" ;;
-                        rdp) url="rdp://localhost:$po" ;;
-                        tcp) url="tcp://localhost:$po" ;;
-                        http) url="http://localhost:$po" ;;
-                        https) url="https://localhost:$po" ;;
-                        *) url="tcp://localhost:$po" ;;
-                    esac
-                    INGRESS_RULES+="  - hostname: $h
+get_tunnel_id() {
+    local name="$1"
+    cloudflared tunnel list --output json 2>/dev/null | \
+        python3 -c "import sys,json; tunnels=json.load(sys.stdin); print([t['id'] for t in tunnels if t['name']=='$name'][0])" 2>/dev/null || \
+        echo ""
+}
+
+get_all_tunnels() {
+    cloudflared tunnel list --output json 2>/dev/null | \
+        python3 -c "
+import sys, json
+tunnels = json.load(sys.stdin)
+for t in tunnels:
+    print(f\"{t['id']}|{t['name']}|{t.get('status','?')}\")
+" 2>/dev/null
+}
+
+list_tunnels() {
+    echo
+    echo "=== ➡️ Tuneis existentes ==="
+    if ! cloudflared tunnel list 2>/dev/null | grep -q '^[a-f0-9]'; then
+        echo "   Nenhum tunel encontrado."
+        return 1
+    fi
+    cloudflared tunnel list 2>/dev/null
+    return 0
+}
+
+select_tunnel() {
+    local name
+    list_tunnels || return 1
+    echo
+    read -r -p "Nome do tunel: " name
+    [ -z "$name" ] && return 1
+    echo "$name"
+}
+
+configure_services() {
+    echo
+    echo "=============================================="
+    echo "  📋 Configurar servicos expostos"
+    echo "=============================================="
+
+    add_one() {
+        local proto host port
+        read -r -p "   Protocolo (http/tcp/ssh/rdp): " proto
+        read -r -p "   Subdominio (ex: ssh.$DOMINIO): " host
+        read -r -p "   Porta local (ex: 22): " port
+
+        if [ -z "$proto" ] || [ -z "$host" ] || [ -z "$port" ]; then
+            echo "   ⚠️  Dados incompletos, ignorando."
+            return
+        fi
+
+        CLOUDFLARED_SERVICES+=("$proto|$host|$port")
+        echo "   ✅ $host -> $proto://localhost:$port"
+    }
+
+    rebuild_ingress() {
+        INGRESS_RULES=""
+        for srv in "${CLOUDFLARED_SERVICES[@]}"; do
+            IFS='|' read -r p h po <<< "$srv"
+            case "$p" in
+                ssh)   url="ssh://localhost:$po" ;;
+                rdp)   url="rdp://localhost:$po" ;;
+                tcp)   url="tcp://localhost:$po" ;;
+                http)  url="http://localhost:$po" ;;
+                https) url="https://localhost:$po" ;;
+                *)     url="tcp://localhost:$po" ;;
+            esac
+            INGRESS_RULES+="  - hostname: $h
     service: $url
 "
-                done
-                echo "   Removido: $removed"
-            else
-                echo "   Nenhum servico para remover."
-            fi
-            ;;
-        3)
-            if [ ${#CLOUDFLARED_SERVICES[@]} -eq 0 ]; then
-                echo "❌ Adicione pelo menos um servico."
-            else
-                break
-            fi
-            ;;
-        4) echo "Cancelado."; exit 0 ;;
-        *) echo "❌ Opcao invalida." ;;
-    esac
-done
+        done
+    }
 
-# ============================================================
-# 7. GERAR CONFIG.YML
-# ============================================================
-echo
-echo "=== ➡️ Gerando $CONFIG_FILE ==="
+    CLOUDFLARED_SERVICES=()
+    INGRESS_RULES=""
+    while true; do
+        echo
+        echo "Servicos atuais: ${#CLOUDFLARED_SERVICES[@]}"
+        echo "  1) Adicionar servico"
+        echo "  2) Remover ultimo servico"
+        echo "  3) Concluir configuracao"
+        echo "  4) Cancelar"
+        read -r -p "Opcao [1-4]: " MENU_OPT
 
-cat > "$CONFIG_FILE" <<EOF
-tunnel: $TUNNEL_ID
-credentials-file: $CREDENTIALS_FILE
+        case "$MENU_OPT" in
+            1) add_one ;;
+            2)
+                if [ ${#CLOUDFLARED_SERVICES[@]} -gt 0 ]; then
+                    echo "   Removido: ${CLOUDFLARED_SERVICES[-1]}"
+                    unset 'CLOUDFLARED_SERVICES[-1]'
+                    rebuild_ingress
+                else
+                    echo "   Nenhum servico para remover."
+                fi
+                ;;
+            3)
+                if [ ${#CLOUDFLARED_SERVICES[@]} -eq 0 ]; then
+                    echo "❌ Adicione pelo menos um servico."
+                else
+                    break
+                fi
+                ;;
+            4) return 1 ;;
+            *) echo "❌ Opcao invalida." ;;
+        esac
+    done
+    return 0
+}
+
+generate_config() {
+    local tunnel_id="$1"
+    local creds="$2"
+    CONFIG_FILE="$HOME/.cloudflared/config.yml"
+    echo
+    echo "=== ➡️ Gerando $CONFIG_FILE ==="
+    mkdir -p "$HOME/.cloudflared"
+    cat > "$CONFIG_FILE" <<EOF
+tunnel: $tunnel_id
+credentials-file: $creds
 
 ingress:
 ${INGRESS_RULES}  - service: http_status:404
 EOF
+    echo "✅ config.yml gerado."
+}
 
-echo "✅ config.yml gerado."
-
-# ============================================================
-# 8. CRIAR REGISTROS DNS
-# ============================================================
-echo
-echo "=== ➡️ Criando registros DNS ==="
-
-for srv in "${CLOUDFLARED_SERVICES[@]}"; do
-    IFS='|' read -r proto host port <<< "$srv"
-    echo "   DNS: $host -> tunel $TUNNEL_NAME"
-    if cloudflared tunnel route dns --overwrite-dns "$TUNNEL_NAME" "$host" 2>&1; then
-        echo "   ✅ Registro DNS criado: $host"
-    else
-        echo "   ❌ Falha ao criar registro DNS para $host."
-        echo "      Execute manualmente:"
-        echo "      cloudflared tunnel route dns $TUNNEL_NAME $host"
-    fi
-done
-
-# ============================================================
-# 9. VERIFICAR REGISTROS DNS
-# ============================================================
-echo
-echo "=== ➡️ Verificando registros DNS no Cloudflare ==="
-cloudflared tunnel route list 2>/dev/null || echo "   ⚠️  Nao foi possivel listar rotas."
-
-# ============================================================
-# 10. INSTALAR COMO SERVICO SYSTEMD
-# ============================================================
-echo
-echo "=== ➡️ Instalando servico systemd ==="
-cloudflared service install
-systemctl enable cloudflared
-systemctl restart cloudflared
-
-# ============================================================
-# 11. VERIFICAR SE O TUNEL ESTA ATIVO
-# ============================================================
-echo
-echo "=== ➡️ Verificando status do tunel ==="
-sleep 2
-if systemctl is-active --quiet cloudflared; then
-    echo "✅ Servico cloudflared: ATIVO"
-else
-    echo "❌ Servico cloudflared: INATIVO"
-    echo "   Logs: journalctl -u cloudflared -n 30"
-fi
-
-# Mostrar logs recentes se houver erro
-if ! cloudflared tunnel info "$TUNNEL_NAME" 2>/dev/null | grep -q "ACTIVE"; then
+create_dns_records() {
+    local tunnel_name="$1"
     echo
-    echo "⚠️  Tunel pode nao estar ativo na Cloudflare."
-    echo "   Verifique com:"
-    echo "   cloudflared tunnel info $TUNNEL_NAME"
-    echo "   cloudflared tunnel route list"
-    echo "   journalctl -u cloudflared -n 50"
-fi
+    echo "=== ➡️ Criando registros DNS ==="
 
-# ============================================================
-# 12. SEGURANCA - FIREWALL E BIND LOCALHOST
-# ============================================================
-echo
-echo "=== ➡️ Reforcando seguranca local ==="
+    for srv in "${CLOUDFLARED_SERVICES[@]}"; do
+        IFS='|' read -r proto host port <<< "$srv"
+        echo "   DNS: $host -> tunel $tunnel_name"
+        if cloudflared tunnel route dns --overwrite-dns "$tunnel_name" "$host" 2>&1; then
+            echo "   ✅ Registro DNS criado: $host"
+        else
+            echo "   ❌ Falha ao criar registro DNS para $host."
+            echo "      Execute manualmente:"
+            echo "      cloudflared tunnel route dns $tunnel_name $host"
+        fi
+    done
+}
 
-echo
-echo "   🔒 Bloqueando acesso externo as portas dos servicos:"
-for srv in "${CLOUDFLARED_SERVICES[@]}"; do
-    IFS='|' read -r proto host port <<< "$srv"
-    if command -v ufw &>/dev/null; then
-        sudo ufw deny "$port/tcp" 2>/dev/null || true
-        echo "   Porta $port bloqueada no firewall."
+list_dns_routes() {
+    echo
+    echo "=== ➡️ Rotas DNS atuais ==="
+    cloudflared tunnel route list 2>&1 || echo "   ⚠️  Nao foi possivel listar rotas."
+}
+
+install_service() {
+    echo
+    echo "=== ➡️ Instalando servico systemd ==="
+    cloudflared service install 2>/dev/null || true
+    systemctl enable cloudflared 2>/dev/null || true
+    systemctl restart cloudflared
+    sleep 2
+    if systemctl is-active --quiet cloudflared; then
+        echo "✅ Servico cloudflared: ATIVO"
+    else
+        echo "❌ Servico cloudflared: INATIVO"
+        echo "   Logs: journalctl -u cloudflared -n 20"
     fi
-done
+}
 
-if command -v ufw &>/dev/null; then
+configure_firewall() {
+    echo
+    echo "=== ➡️ Firewall ==="
+    if ! command -v ufw &>/dev/null; then
+        echo "   ufw nao encontrado, pulando."
+        return
+    fi
+    echo "   Bloqueando acesso externo as portas dos servicos:"
+    for srv in "${CLOUDFLARED_SERVICES[@]}"; do
+        IFS='|' read -r proto host port <<< "$srv"
+        sudo ufw deny "$port/tcp" 2>/dev/null || true
+        echo "   Porta $port bloqueada."
+    done
     sudo ufw reload 2>/dev/null || true
-fi
+    echo
+    echo "   ⚠️  Configure cada servico para escutar apenas localhost."
+}
 
-echo
-echo "   ⚠️  IMPORTANTE: Configure cada servico para escutar apenas localhost."
-echo "   Exemplos:"
-echo "   - SSH: edite /etc/ssh/sshd_config e adicione 'ListenAddress 127.0.0.1'"
-echo "   - Web/App: configure bind para 127.0.0.1 em vez de 0.0.0.0"
-echo
+configure_access() {
+    local api_token="$1"
+    [ -z "$api_token" ] && return
 
-# ============================================================
-# 13. CLOUDFLARE ACCESS (se token informado)
-# ============================================================
-if [ -n "$API_TOKEN" ]; then
-    echo "=== ➡️ Configurando Cloudflare Access (Zero Trust) ==="
+    echo
+    echo "=== ➡️ Cloudflare Access (Zero Trust) ==="
 
-    # Obter Account ID
-    echo "   Obtendo Account ID..."
     ACCOUNT_ID=$(curl -s https://api.cloudflare.com/client/v4/accounts \
-        -H "Authorization: Bearer $API_TOKEN" \
+        -H "Authorization: Bearer $api_token" \
         -H "Content-Type: application/json" | \
         grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
 
     if [ -z "$ACCOUNT_ID" ]; then
-        echo "❌ Falha ao obter Account ID. Verifique seu API Token."
-        echo "   Continuando sem Cloudflare Access..."
-    else
-        echo "   Account ID: $ACCOUNT_ID"
+        echo "❌ Falha ao obter Account ID. Verifique o API Token."
+        return
+    fi
+    echo "   Account ID: $ACCOUNT_ID"
 
-        echo
-        echo "Escolha o metodo de autenticacao para o Access:"
-        echo "  1) One-time PIN (enviado por email)"
-        echo "  2) Google OAuth"
-        read -r -p "Opcao [1-2]: " ACCESS_METHOD
+    echo
+    echo "Metodo de autenticacao:"
+    echo "  1) One-time PIN (email)"
+    echo "  2) Google OAuth"
+    read -r -p "Opcao [1-2]: " ACCESS_METHOD
 
-        read -r -p "Emails autorizados (separados por virgula): " ACCESS_EMAILS
-        IFS=',' read -ra EMAIL_ARRAY <<< "$ACCESS_EMAILS"
+    read -r -p "Emails autorizados (virgula): " ACCESS_EMAILS
+    IFS=',' read -ra EMAIL_ARRAY <<< "$ACCESS_EMAILS"
 
-        # Dependendo do método
+    EMAIL_RULE=""
+    for email in "${EMAIL_ARRAY[@]}"; do
+        email=$(echo "$email" | xargs)
+        [ -n "$EMAIL_RULE" ] && EMAIL_RULE+=","
+        EMAIL_RULE+="\"$email\""
+    done
+
+    for srv in "${CLOUDFLARED_SERVICES[@]}"; do
+        IFS='|' read -r proto host port <<< "$srv"
+        echo "   Criando Access para: $host"
+
+        APP_RESPONSE=$(curl -s -X POST \
+            "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/access/apps" \
+            -H "Authorization: Bearer $api_token" \
+            -H "Content-Type: application/json" \
+            -d "{\"name\":\"$host\",\"domain\":\"$host\",\"session_duration\":\"24h\",\"type\":\"self_hosted\",\"allowed_idps\":[]}")
+
+        APP_ID=$(echo "$APP_RESPONSE" | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
+        [ -z "$APP_ID" ] && { echo "   ⚠️  Falha: $APP_RESPONSE"; continue; }
+
         if [ "$ACCESS_METHOD" = "2" ]; then
-            read -r -p "Google Client ID: " GOOGLE_CLIENT_ID
-            read -r -p "Google Client Secret: " GOOGLE_CLIENT_SECRET
+            POLICY_PAYLOAD="{\"name\":\"$host\",\"decision\":\"allow\",\"include\":[{\"email\":{\"email\":[$EMAIL_RULE]}}],\"precedence\":1}"
+        else
+            POLICY_PAYLOAD="{\"name\":\"$host\",\"decision\":\"allow\",\"include\":[{\"email\":{\"email\":[$EMAIL_RULE]}}],\"precedence\":1}"
         fi
 
-        # Criar Access Application e Policy para cada servico
-        for srv in "${CLOUDFLARED_SERVICES[@]}"; do
-            IFS='|' read -r proto host port <<< "$srv"
+        curl -s -X POST \
+            "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/access/apps/$APP_ID/policies" \
+            -H "Authorization: Bearer $api_token" \
+            -H "Content-Type: application/json" \
+            -d "$POLICY_PAYLOAD" > /dev/null && \
+            echo "   ✅ Access: $host" || echo "   ⚠️  Falha na politica."
+    done
 
-            echo "   Criando Access para: $host"
-
-            # --- Session duration: 24h ---
-            SESSION_DUR="24h"
-
-            # --- Criar Access Application ---
-            APP_PAYLOAD=$(cat <<APPDATA
-{
-  "name": "$host",
-  "domain": "$host",
-  "session_duration": "$SESSION_DUR",
-  "type": "self_hosted",
-  "allowed_idps": []
+    echo "✅ Cloudflare Access configurado."
 }
-APPDATA
-)
 
-            APP_RESPONSE=$(curl -s -X POST \
-                "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/access/apps" \
-                -H "Authorization: Bearer $API_TOKEN" \
-                -H "Content-Type: application/json" \
-                -d "$APP_PAYLOAD")
+verify_status() {
+    local tunnel_name="$1"
+    echo
+    echo "=============================================="
+    echo "  📊 Status do Tunel: $tunnel_name"
+    echo "=============================================="
 
-            APP_ID=$(echo "$APP_RESPONSE" | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
+    echo "--- cloudflared tunnel info ---"
+    cloudflared tunnel info "$tunnel_name" 2>&1 || echo "   ⚠️  Falha ao obter info."
 
-            if [ -z "$APP_ID" ]; then
-                echo "   ⚠️  Falha ao criar Access App para $host"
-                echo "   Resposta: $APP_RESPONSE"
+    echo
+    echo "--- Rotas DNS ---"
+    cloudflared tunnel route list 2>&1 || echo "   ⚠️  Nenhuma rota."
+
+    echo
+    echo "--- Servico cloudflared ---"
+    systemctl is-active cloudflared && echo "   ATIVO" || echo "   INATIVO"
+
+    echo
+    echo "--- Ultimos logs ---"
+    journalctl -u cloudflared --no-pager -n 10 2>/dev/null || true
+    echo "=============================================="
+}
+
+delete_everything() {
+    echo
+    echo "⚠️  ATENCAO: Isso excluira TUDO (tuneis, DNS, configuracao, servico)."
+    read -r -p "Digite 'DELETAR' para confirmar: " CONFIRM
+    [ "$CONFIRM" != "DELETAR" ] && { echo "Cancelado."; return; }
+
+    local tunnels
+    tunnels=$(get_all_tunnels)
+    if [ -z "$tunnels" ]; then
+        echo "Nenhum tunel encontrado."
+    else
+        echo "Tuneis que serao excluidos:"
+        echo "$tunnels" | while IFS='|' read -r id name status; do
+            echo "   - $name ($id)"
+        done
+        echo "$tunnels" | while IFS='|' read -r id name status; do
+            echo "=> Excluindo tunel: $name ($id)"
+
+            # Deletar rotas DNS
+            echo "   Removendo rotas DNS..."
+            cloudflared tunnel route list 2>/dev/null | grep "$id" | while read -r line; do
+                cname=$(echo "$line" | awk '{print $4}')
+                [ -n "$cname" ] && cloudflared tunnel route delete "$id" "$cname" 2>/dev/null || true
+            done || true
+
+            # Excluir tunel
+            cloudflared tunnel delete -f "$id" 2>/dev/null || true
+            echo "   ✅ Tunel '$name' excluido."
+        done
+    fi
+
+    # Parar e remover servico
+    echo
+    echo "=> Removendo servico systemd..."
+    systemctl stop cloudflared 2>/dev/null || true
+    systemctl disable cloudflared 2>/dev/null || true
+    rm -f /etc/systemd/system/cloudflared*.service
+    systemctl daemon-reload 2>/dev/null || true
+
+    # Remover configuracao
+    echo "=> Removendo arquivos de configuracao..."
+    rm -rf "$HOME/.cloudflared" 2>/dev/null || true
+
+    # Remover repo e desinstalar cloudflared
+    read -r -p "Desinstalar o cloudflared? [s/N]: " UNINSTALL
+    if [ "$UNINSTALL" = "s" ] || [ "$UNINSTALL" = "S" ]; then
+        rm -f /etc/apt/sources.list.d/cloudflared.list
+        sudo apt remove -y cloudflared 2>/dev/null || true
+        echo "   cloudflared removido."
+    fi
+
+    echo
+    echo "✅ Tudo excluido."
+}
+
+# ============================================================
+# MENU PRINCIPAL
+# ============================================================
+
+while true; do
+    echo
+    echo "=============================================="
+    echo "  🔧 $appNome"
+    echo "=============================================="
+    echo
+    echo "  1) Instalar o túnel"
+    echo "  2) Criar os registros DNS"
+    echo "  3) Excluir tudo (túnel e DNS)"
+    echo "  4) Status do túnel"
+    echo "  5) Sair"
+    echo
+    read -r -p "Opcao [1-5]: " MAIN_OPT
+
+    case "$MAIN_OPT" in
+        1)
+            # --- INSTALAR O TUNEL ---
+            read -r -p "Dominio no Cloudflare (ex: meudominio.com): " DOMINIO
+            [ -z "$DOMINIO" ] && { echo "❌ Dominio nao informado."; continue; }
+
+            read -r -p "Nome do tunel (padrao: homelab): " TUNNEL_NAME
+            TUNNEL_NAME="${TUNNEL_NAME:-homelab}"
+
+            echo
+            read -r -p "API Token Cloudflare para Access/Zero Trust (ou Enter para pular): " API_TOKEN
+
+            # 1. Instalar cloudflared
+            if ! command -v cloudflared &>/dev/null; then
+                install_cloudflared
+            else
+                echo "✅ cloudflared ja esta instalado."
+            fi
+
+            # 2. Autenticar
+            authenticate
+
+            # 3. Criar tunel
+            echo
+            echo "=== ➡️ Criando tunel: $TUNNEL_NAME ==="
+            TUNNEL_ID=$(get_tunnel_id "$TUNNEL_NAME")
+            if [ -n "$TUNNEL_ID" ]; then
+                echo "   Tunel '$TUNNEL_NAME' ja existe (ID: $TUNNEL_ID)."
+            else
+                cloudflared tunnel create "$TUNNEL_NAME"
+                TUNNEL_ID=$(get_tunnel_id "$TUNNEL_NAME")
+                echo "✅ Tunel criado (ID: $TUNNEL_ID)."
+            fi
+
+            CREDENTIALS_FILE=$(ls "$HOME/.cloudflared/"*.json 2>/dev/null | head -1)
+
+            # 4. Configurar servicos
+            if ! configure_services; then
+                echo "Configuracao cancelada."
                 continue
             fi
 
-            echo "   Access App ID: $APP_ID"
+            # 5. Gerar config.yml
+            generate_config "$TUNNEL_ID" "$CREDENTIALS_FILE"
 
-            # --- Montar regra de email ---
-            EMAIL_RULE=""
-            for email in "${EMAIL_ARRAY[@]}"; do
-                email=$(echo "$email" | xargs)  # trim
-                if [ -n "$EMAIL_RULE" ]; then
-                    EMAIL_RULE+=" or "
-                fi
-                EMAIL_RULE+="\"$email\""
+            # 6. Criar registros DNS
+            create_dns_records "$TUNNEL_NAME"
+            list_dns_routes
+
+            # 7. Instalar servico
+            install_service
+
+            # 8. Firewall
+            configure_firewall
+
+            # 9. Access (opcional)
+            configure_access "$API_TOKEN"
+
+            # 10. Verificacao
+            verify_status "$TUNNEL_NAME"
+
+            echo
+            echo "=============================================="
+            echo "✅ Tunel instalado com sucesso!"
+            echo "   Tunel   : $TUNNEL_NAME"
+            echo "   Dominio : $DOMINIO"
+            echo "   Config  : $CONFIG_FILE"
+            echo
+            echo "   🌐 Servicos:"
+            for srv in "${CLOUDFLARED_SERVICES[@]}"; do
+                IFS='|' read -r proto host port <<< "$srv"
+                echo "      https://$host -> localhost:$port"
             done
+            echo
+            echo "   🔍 Dashboard: https://one.dash.cloudflare.com/"
+            echo "      Zero Trust > Networks > Tunnels"
+            echo "=============================================="
+            ;;
 
-            # --- Criar Access Policy ---
-            if [ "$ACCESS_METHOD" = "2" ]; then
-                POLICY_PAYLOAD=$(cat <<POLICY
-{
-  "name": "$host - Google Auth",
-  "decision": "allow",
-  "include": [
-    {
-      "login_method": {
-        "id": "$GOOGLE_CLIENT_ID"
-      }
-    },
-    {
-      "email": {
-        "email": [$EMAIL_RULE]
-      }
-    }
-  ],
-  "precedence": 1
-}
-POLICY
-)
-            else
-                POLICY_PAYLOAD=$(cat <<POLICY
-{
-  "name": "$host - Email PIN",
-  "decision": "allow",
-  "include": [
-    {
-      "email": {
-        "email": [$EMAIL_RULE]
-      }
-    }
-  ],
-  "precedence": 1
-}
-POLICY
-)
+        2)
+            # --- CRIAR REGISTROS DNS ---
+            TUNNEL_NAME=$(select_tunnel)
+            [ -z "$TUNNEL_NAME" ] && continue
+
+            read -r -p "Dominio no Cloudflare (ex: meudominio.com): " DOMINIO
+            [ -z "$DOMINIO" ] && { echo "❌ Dominio nao informado."; continue; }
+
+            # Configurar servicos
+            CLOUDFLARED_SERVICES=()
+            INGRESS_RULES=""
+            if ! configure_services; then
+                echo "Cancelado."
+                continue
             fi
 
-            POLICY_RESPONSE=$(curl -s -X POST \
-                "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/access/apps/$APP_ID/policies" \
-                -H "Authorization: Bearer $API_TOKEN" \
-                -H "Content-Type: application/json" \
-                -d "$POLICY_PAYLOAD")
+            # Atualizar config.yml
+            TUNNEL_ID=$(get_tunnel_id "$TUNNEL_NAME")
+            CREDENTIALS_FILE=$(ls "$HOME/.cloudflared/"*.json 2>/dev/null | head -1)
+            generate_config "$TUNNEL_ID" "$CREDENTIALS_FILE"
 
-            POLICY_RESPONSE_OK=$(echo "$POLICY_RESPONSE" | grep -o '"success":true')
+            # Criar DNS
+            create_dns_records "$TUNNEL_NAME"
+            list_dns_routes
 
-            if [ -n "$POLICY_RESPONSE_OK" ]; then
-                echo "   ✅ Access configurado para $host"
-            else
-                echo "   ⚠️  Falha ao criar politica de acesso:"
-                echo "   $POLICY_RESPONSE"
+            # Reiniciar servico
+            echo
+            echo "=== ➡️ Reiniciando servico ==="
+            systemctl restart cloudflared 2>/dev/null || true
+            echo "✅ Servico reiniciado."
+            ;;
+
+        3)
+            # --- EXCLUIR TUDO ---
+            delete_everything
+            ;;
+
+        4)
+            # --- STATUS ---
+            if ! list_tunnels; then
+                continue
             fi
+            read -r -p "Nome do tunel para ver status: " TUNNEL_NAME
+            [ -z "$TUNNEL_NAME" ] && continue
+            verify_status "$TUNNEL_NAME"
+            ;;
 
-        done
+        5)
+            echo "Saindo..."
+            exit 0
+            ;;
 
-        echo
-        echo "✅ Cloudflare Access configurado."
-        echo "   Antes de acessar, o usuario precisara autenticar."
-    fi
-else
-    echo
-    echo "⚠️  Cloudflare Access NAO configurado (API Token nao informado)."
-    echo "   Configure manualmente no dashboard: https://one.dash.cloudflare.com/"
-fi
-
-# ============================================================
-# 14. VERIFICACAO FINAL
-# ============================================================
-echo
-echo "=============================================="
-echo "  📊 Status do Tunel"
-echo "=============================================="
-echo
-
-echo "--- cloudflared tunnel info ---"
-cloudflared tunnel info "$TUNNEL_NAME" 2>&1 || echo "   ⚠️  Falha ao obter info do tunel."
-
-echo
-echo "--- cloudflared tunnel route list ---"
-cloudflared tunnel route list 2>&1 || echo "   ⚠️  Falha ao listar rotas DNS."
-
-echo
-echo "--- systemctl status cloudflared ---"
-systemctl is-active cloudflared && echo "   Servico: ATIVO" || echo "   Servico: INATIVO"
-
-echo
-echo "--- Ultimos logs do cloudflared ---"
-journalctl -u cloudflared --no-pager -n 10 2>/dev/null || echo "   Nao foi possivel ler os logs."
-
-echo
-echo "=============================================="
-echo "  ✅ $appNome configurado!"
-echo "=============================================="
-echo
-echo "   Tunel      : $TUNNEL_NAME"
-echo "   Dominio    : $DOMINIO"
-echo "   Config     : $CONFIG_FILE"
-echo
-echo "   🌐 Servicos disponiveis:"
-for srv in "${CLOUDFLARED_SERVICES[@]}"; do
-    IFS='|' read -r proto host port <<< "$srv"
-    echo "      https://$host -> localhost:$port"
+        *)
+            echo "❌ Opcao invalida."
+            ;;
+    esac
 done
-echo
-echo "   🔍 Verifique o status no dashboard:"
-echo "      https://one.dash.cloudflare.com/"
-echo "      Va em: Zero Trust > Networks > Tunnels"
-echo
-echo "   📝 Comandos para diagnostico:"
-echo "      cloudflared tunnel list"
-echo "      cloudflared tunnel info $TUNNEL_NAME"
-echo "      cloudflared tunnel route list"
-echo "      systemctl status cloudflared"
-echo "      journalctl -u cloudflared -f"
-echo
-if [ -n "$API_TOKEN" ] && [ -n "$ACCOUNT_ID" ]; then
-    echo "   🔐 Access dashboard: https://one.dash.cloudflare.com/"
-fi
-echo "=============================================="
