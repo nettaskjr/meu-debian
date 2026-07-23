@@ -339,18 +339,9 @@ verify_status() {
 }
 
 delete_everything() {
+    # --- Listar e selecionar tunel ---
     echo
-    echo "⚠️  ATENCAO: Isso excluira TUDO (tuneis, DNS, configuracao, servico)."
-    read -r -p "Digite 'DELETAR' para confirmar: " CONFIRM
-    [ "$CONFIRM" != "DELETAR" ] && { echo "Cancelado."; return; }
-
-    # --- Parar servico primeiro ---
-    echo
-    echo "=> Parando servico cloudflared..."
-    systemctl stop cloudflared 2>/dev/null || true
-    systemctl disable cloudflared 2>/dev/null || true
-
-    # --- Obter dados dos tuneis (JSON) ---
+    echo "=== ➡️ Tuneis existentes ==="
     local tunnels_json
     tunnels_json=$(cloudflared tunnel list --output json 2>/dev/null || echo "[]")
 
@@ -359,106 +350,185 @@ delete_everything() {
 
     if [ "$tunnel_count" -eq 0 ]; then
         echo "Nenhum tunel encontrado no Cloudflare."
-    else
-        echo "Tuneis encontrados: $tunnel_count"
-        echo "$tunnels_json" | python3 -c "
+        return
+    fi
+
+    echo "$tunnels_json" | python3 -c "
 import sys, json
 tunnels = json.load(sys.stdin)
-for t in tunnels:
-    print(f\"{t['id']}|{t['name']}\")
-" 2>/dev/null | while IFS='|' read -r tid tname; do
-            echo
-            echo "=== ➡️ Excluindo tunel: $tname ($tid) ==="
+for i, t in enumerate(tunnels, 1):
+    status = t.get('status', t.get('connections', '?'))
+    print(f\"  {i}) {t['name']}  (id: {t['id'][:12]}...  status: {status})\")
+" 2>/dev/null
+    echo "  0) Cancelar"
+    echo
+    read -r -p "Qual tunel excluir? [1-$tunnel_count ou 0]: " TUNNEL_IDX
 
-            echo "   Removendo rotas DNS..."
-            cloudflared tunnel route list --output json 2>/dev/null | python3 -c "
+    if [ "$TUNNEL_IDX" = "0" ] || [ -z "$TUNNEL_IDX" ]; then
+        echo "Cancelado."
+        return
+    fi
+
+    # Extrair ID e nome do tunel selecionado
+    local selected
+    selected=$(echo "$tunnels_json" | python3 -c "
+import sys, json
+tunnels = json.load(sys.stdin)
+idx = int(sys.argv[1]) - 2  # argv[1] is the user's choice, but we need to adjust — actually let me fix this
+" 2>/dev/null)
+
+    # Melhor abordagem: usar awk/line number
+    local tid tname
+    tid=$(echo "$tunnels_json" | python3 -c "
+import sys, json
+tunnels = json.load(sys.stdin)
+t = tunnels[int('$TUNNEL_IDX') - 1]
+print(t['id'])
+" 2>/dev/null)
+    tname=$(echo "$tunnels_json" | python3 -c "
+import sys, json
+tunnels = json.load(sys.stdin)
+t = tunnels[int('$TUNNEL_IDX') - 1]
+print(t['name'])
+" 2>/dev/null)
+
+    if [ -z "$tid" ] || [ -z "$tname" ]; then
+        echo "❌ Selecao invalida."
+        return
+    fi
+
+    # --- Listar rotas DNS do tunel ---
+    echo
+    echo "=== ➡️ Rotas DNS do tunel '$tname' ==="
+    local routes_json
+    routes_json=$(cloudflared tunnel route list --output json 2>/dev/null || echo "[]")
+    local route_hostnames
+    route_hostnames=$(echo "$routes_json" | python3 -c "
 import sys, json
 routes = json.load(sys.stdin)
 for r in routes:
     if r.get('tunnel_id') == '$tid' or r.get('tunnel_name') == '$tname':
         print(r.get('value', r.get('dns_name', '')))
-" 2>/dev/null | while read -r hostname; do
-                if [ -n "$hostname" ]; then
-                    echo "   -> $hostname"
-                    cloudflared tunnel route delete "$tid" "$hostname" 2>/dev/null || \
-                    cloudflared tunnel route delete -f "$tid" "$hostname" 2>/dev/null || \
-                    echo "   ⚠️  Nao foi possivel deletar rota: $hostname"
-                fi
-            done
-            echo "   Rotas DNS removidas."
+" 2>/dev/null)
 
-            # --- Deletar o tunel ---
-            echo "   Excluindo tunnel..."
-            if cloudflared tunnel delete -f "$tid" 2>&1; then
-                echo "   ✅ Tunel '$tname' excluido do Cloudflare."
-            else
-                echo "   ⚠️  Falha ao excluir tunel '$tname'."
-                echo "   Tente manualmente: cloudflared tunnel delete $tid"
-            fi
+    if [ -z "$route_hostnames" ]; then
+        echo "   Nenhuma rota DNS associada."
+    else
+        echo "$route_hostnames" | while read -r hostname; do
+            [ -n "$hostname" ] && echo "   - $hostname"
         done
     fi
 
-    # --- Deletar Access Apps via API (se token foi usado) ---
+    # --- Aviso e confirmacao ---
+    echo
+    echo "=============================================="
+    echo "  ⚠️  Resumo da exclusao:"
+    echo "  Tunel      : $tname ($tid)"
+    echo "  Rotas DNS  : $(echo "$route_hostnames" | wc -l)"
+    echo "  Config local: $HOME/.cloudflared/"
+    echo "  Servico    : cloudflared (systemd)"
+    echo "=============================================="
+    echo
+    echo "⚠️  ATENCAO: Apenas o tunel '$tname' e suas rotas serao excluidos."
+    echo "   Outros tuneis na conta NAO serao afetados."
+    echo
+    read -r -p "Digite 'DELETAR' para confirmar: " CONFIRM
+    [ "$CONFIRM" != "DELETAR" ] && { echo "Cancelado."; return; }
+
+    # --- Executar exclusao ---
+    echo
+
+    # Deletar rotas DNS do tunel
+    echo "=> Removendo rotas DNS..."
+    echo "$route_hostnames" | while read -r hostname; do
+        if [ -n "$hostname" ]; then
+            echo "   -> $hostname"
+            cloudflared tunnel route delete "$tid" "$hostname" 2>/dev/null || \
+            cloudflared tunnel route delete -f "$tid" "$hostname" 2>/dev/null || \
+            echo "   ⚠️  Nao foi possivel deletar: $hostname"
+        fi
+    done
+    echo "   Rotas DNS removidas."
+
+    # Deletar Access Apps (se token salvo)
     if [ -f "$HOME/.cloudflared/access_token" ]; then
         local saved_token
         saved_token=$(cat "$HOME/.cloudflared/access_token" 2>/dev/null || true)
-    fi
-    if [ -n "${saved_token:-}" ]; then
-        echo
-        echo "=== ➡️ Removendo Cloudflare Access Apps ==="
-        local acct_id
-        acct_id=$(curl -s https://api.cloudflare.com/client/v4/accounts \
-            -H "Authorization: Bearer $saved_token" \
-            -H "Content-Type: application/json" | \
-            grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
-
-        if [ -n "$acct_id" ]; then
-            curl -s "https://api.cloudflare.com/client/v4/accounts/$acct_id/access/apps" \
+        if [ -n "${saved_token:-}" ]; then
+            echo "=> Removendo Cloudflare Access Apps..."
+            local acct_id
+            acct_id=$(curl -s https://api.cloudflare.com/client/v4/accounts \
                 -H "Authorization: Bearer $saved_token" \
                 -H "Content-Type: application/json" | \
-                python3 -c "
+                grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
+
+            if [ -n "$acct_id" ]; then
+                echo "$route_hostnames" | while read -r hostname; do
+                    [ -z "$hostname" ] && continue
+                    # Buscar Access App por dominio
+                    local app_id
+                    app_id=$(curl -s "https://api.cloudflare.com/client/v4/accounts/$acct_id/access/apps" \
+                        -H "Authorization: Bearer $saved_token" \
+                        -H "Content-Type: application/json" | \
+                        python3 -c "
 import sys, json
 data = json.load(sys.stdin)
 for app in data.get('result', []):
-    print(app['id'])
-" 2>/dev/null | while read -r app_id; do
-                [ -n "$app_id" ] && curl -s -X DELETE \
-                    "https://api.cloudflare.com/client/v4/accounts/$acct_id/access/apps/$app_id" \
-                    -H "Authorization: Bearer $saved_token" > /dev/null && \
-                    echo "   Access App $app_id removido."
-            done
-            echo "   Access Apps removidos."
+    if app.get('domain') == '$hostname':
+        print(app['id'])
+" 2>/dev/null)
+                    if [ -n "$app_id" ]; then
+                        curl -s -X DELETE \
+                            "https://api.cloudflare.com/client/v4/accounts/$acct_id/access/apps/$app_id" \
+                            -H "Authorization: Bearer $saved_token" > /dev/null && \
+                            echo "   Access App $hostname removido."
+                    fi
+                done
+            fi
         fi
     fi
 
-    # --- Limpeza local ---
-    echo
-    echo "=> Removendo servico systemd..."
-    rm -f /etc/systemd/system/cloudflared*.service
-    rm -f /lib/systemd/system/cloudflared*.service
-    systemctl daemon-reload 2>/dev/null || true
+    # Deletar o tunel
+    echo "=> Excluindo tunel '$tname'..."
+    if cloudflared tunnel delete -f "$tid" 2>&1; then
+        echo "✅ Tunel '$tname' excluido do Cloudflare."
+    else
+        echo "⚠️  Falha ao excluir tunel '$tname'."
+        echo "   Tente manualmente: cloudflared tunnel delete $tid"
+    fi
 
-    echo "=> Removendo arquivos de configuracao..."
-    rm -rf "$HOME/.cloudflared" 2>/dev/null || true
+    # --- Limpeza local (apenas se era o unico tunel ativo) ---
+    local remaining
+    remaining=$(cloudflared tunnel list --output json 2>/dev/null | python3 -c "import sys,json;print(len(json.load(sys.stdin)))" 2>/dev/null || echo "0")
+    if [ "$remaining" -eq 0 ]; then
+        echo
+        echo "=> Nenhum tunel restante. Removendo configuracao local..."
+        systemctl stop cloudflared 2>/dev/null || true
+        systemctl disable cloudflared 2>/dev/null || true
+        rm -f /etc/systemd/system/cloudflared*.service
+        rm -f /lib/systemd/system/cloudflared*.service
+        systemctl daemon-reload 2>/dev/null || true
+        rm -rf "$HOME/.cloudflared" 2>/dev/null || true
+        echo "   Configuracao local removida."
 
-    # Remover repo e desinstalar cloudflared
-    read -r -p "Desinstalar o cloudflared? [s/N]: " UNINSTALL
-    if [ "$UNINSTALL" = "s" ] || [ "$UNINSTALL" = "S" ]; then
-        rm -f /etc/apt/sources.list.d/cloudflared.list
-        sudo apt remove -y cloudflared 2>/dev/null || true
-        echo "   cloudflared removido."
+        read -r -p "Desinstalar o cloudflared? [s/N]: " UNINSTALL
+        if [ "$UNINSTALL" = "s" ] || [ "$UNINSTALL" = "S" ]; then
+            rm -f /etc/apt/sources.list.d/cloudflared.list
+            sudo apt remove -y cloudflared 2>/dev/null || true
+            echo "   cloudflared removido."
+        fi
+    else
+        echo
+        echo "Ainda existem $remaining tunel(s) na conta. Configuracao local mantida."
     fi
 
     # --- Verificacao ---
     echo
-    echo "=== ➡️ Verificando cleanup ==="
+    echo "=== ➡️ Verificando ==="
     echo "Tuneis restantes:"
-    cloudflared tunnel list 2>/dev/null || echo "   Nenhum (ou cloudflared ja removido)."
+    cloudflared tunnel list 2>/dev/null || echo "   Nenhum."
     echo
-    echo "Rotas DNS restantes:"
-    cloudflared tunnel route list 2>/dev/null || echo "   Nenhuma (ou cloudflared ja removido)."
-    echo
-    echo "✅ Tudo excluido."
+    echo "✅ Tunel '$tname' excluido."
 }
 
 # ============================================================
@@ -473,7 +543,7 @@ while true; do
     echo
     echo "  1) Instalar o túnel"
     echo "  2) Criar os registros DNS"
-    echo "  3) Excluir tudo (túnel e DNS)"
+    echo "  3) Excluir um túnel"
     echo "  4) Status do túnel"
     echo "  5) Sair"
     echo
