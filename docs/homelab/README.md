@@ -8,17 +8,17 @@
                          ┌───────────────────────────────┐
   Internet               │         Homelab (Debian)      │
                          │                               │
-  🌐 Navegador ─────────┤  🔒 Cloudflare Tunnel         │
+  🌐 Navegador ──────────┤  🔒 Cloudflare Tunnel        │
      (HTTPS direto)      │     ↓ localhost               │
                          │  ┌─────────────────────────┐  │
-  💻 SSH/RDP ───────────┤  │ Serviços                │  │
+  💻 SSH/RDP ────────────┤  │ Serviços                │  │
      (cloudflared)       │  │  :22  SSH               │  │
                          │  │  :53  DNS (Bind9)       │  │
                          │  │  :443 Apps (Docker)     │  │
                          │  │  :3389 RDP (xRDP)       │  │
                          │  └─────────────────────────┘  │
                          │                               │
-                         │  🌐 Rede local: 192.168.x.x  │
+                         │  🌐 Rede local: 192.168.x.x   │
                          └───────────────────────────────┘
 ```
 
