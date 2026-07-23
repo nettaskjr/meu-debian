@@ -50,9 +50,23 @@ echo
 echo "=== ➡️ Instalando cloudflared ==="
 
 if ! command -v cloudflared &>/dev/null; then
+    CODENAME=$(lsb_release -cs)
+    echo "   Codename detectado: $CODENAME"
+
+    SUPPORTED="bookworm bullseye jammy noble"
+    if echo "$SUPPORTED" | grep -qw "$CODENAME"; then
+        REPO_CODENAME="$CODENAME"
+    elif grep -q "bookworm" /etc/apt/sources.list /etc/apt/sources.list.d/*.list 2>/dev/null; then
+        REPO_CODENAME="bookworm"
+    else
+        # Fallback: tenta bookworm (Debian 12) como compatível
+        REPO_CODENAME="bookworm"
+    fi
+
+    echo "   Usando repositorio: $REPO_CODENAME"
     curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg | \
         sudo gpg --dearmor -o /usr/share/keyrings/cloudflare-main.gpg
-    echo "deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared $(lsb_release -cs) main" | \
+    echo "deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared $REPO_CODENAME main" | \
         sudo tee /etc/apt/sources.list.d/cloudflared.list > /dev/null
     sudo apt update -y
     sudo apt install -y cloudflared
