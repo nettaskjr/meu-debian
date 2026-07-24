@@ -1,0 +1,45 @@
+# ============================================================
+# Preencha os valores abaixo
+# ============================================================
+
+# Dominio no Cloudflare
+domain = "nettask.com.br"
+
+# Nome do tunel
+tunnel_name = "homelab"
+
+# Cloudflare Account ID (va em: https://dash.cloudflare.com/ -> copie da URL)
+account_id = "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+
+# Token secreto do tunel (gere com: openssl rand -base64 32)
+tunnel_secret = ""
+
+# API Token (sera enviado via variavel de ambiente ou digitado na hora)
+# Exporte: export TF_VAR_api_token="seu-token-aqui"
+
+# ============================================================
+# Servicos expostos via tunel
+# ============================================================
+
+services = {
+  ssh = {
+    hostname = "ssh"
+    proto    = "ssh"
+    port     = 22
+  }
+  # app = {
+  #   hostname = "app"
+  #   proto    = "http"
+  #   port     = 8080
+  # }
+}
+
+# ============================================================
+# Cloudflare Access (Zero Trust) — opcional
+# ============================================================
+
+access_enabled = true
+
+access_emails = [
+  # "seu@email.com",
+]

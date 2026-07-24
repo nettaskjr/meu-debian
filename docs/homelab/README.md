@@ -210,60 +210,70 @@ nslookup www.casa.local 127.0.0.1
 
 ---
 
-### 6. Cloudflare Tunnel (acesso externo via Zero Trust)
+### 6. Cloudflare Tunnel (acesso externo via Terraform)
 
-Cria um túnel criptografado outbound para a Cloudflare, permitindo acesso externo sem abrir portas no roteador.
+Cria um túnel criptografado outbound para a Cloudflare, permitindo acesso externo sem abrir portas no roteador. Os recursos Cloudflare (túnel, DNS, Access) são gerenciados por **Terraform** — com estado, idempotência e `destroy` garantido.
 
 ```bash
 sudo bash scripts/cloudflare-tunnel/cloudflare-tunnel.sh
 ```
 
-**Menu principal:**
-
-```
-  1) Instalar o túnel
-  2) Criar os registros DNS
-  3) Excluir um túnel
-  4) Status do túnel
-  5) Sair
-```
-
-#### 6.1 Instalar o túnel (opção 1)
+**O script faz:**
+1. Instala **Terraform** (se não estiver instalado)
+2. Instala o **cloudflared** (com fallback `bookworm` se Debian 13)
+3. Autentica no Cloudflare (abre navegador)
+4. Cria `terraform.tfvars` interativamente
+5. Executa `terraform init` → `terraform plan` → `terraform apply`
+6. Configura `cloudflared` local
+7. Instala como serviço systemd
 
 **O script pergunta:**
+- API Token Cloudflare
+- Account ID (URL do dashboard)
+- Domínio
+- Nome do túnel
 
-- Domínio configurado no Cloudflare (ex: `seuhomelab.com.br`)
-- Nome do túnel (padrão: `homelab`)
-- API Token (opcional — para Cloudflare Access)
-
-**Serviços a expor (menu interativo):**
-
-| Protocolo | Subdomínio               | Porta local |
-| --------- | ------------------------- | ----------- |
-| `ssh`   | `ssh.seuhomelab.com.br` | `22`      |
-| `http`  | `app.seuhomelab.com.br` | `8080`    |
-| `rdp`   | `rdp.seuhomelab.com.br` | `3389`    |
-
-**O script faz:**
-
-1. Instala o `cloudflared` (com fallback `bookworm` se Debian 13)
-2. Autentica no Cloudflare (abre navegador)
-3. Cria o túnel
-4. Configura ingress (serviços)
-5. Gera `~/.cloudflared/config.yml`
-6. Cria registros DNS no Cloudflare
-7. Instala como serviço systemd
-8. Exibe instruções de acesso por protocolo
-
-**Verificação:**
+**Após o script, edite `terraform.tfvars` para configurar os serviços:**
 
 ```bash
-cloudflared tunnel info homelab
-systemctl status cloudflared
-journalctl -u cloudflared -n 20
+sudo nano scripts/cloudflare-tunnel/terraform/terraform.tfvars
 ```
 
-#### 6.2 Configurar os clientes
+```hcl
+services = {
+  ssh = {
+    hostname = "ssh"
+    proto    = "ssh"
+    port     = 22
+  }
+  app = {
+    hostname = "app"
+    proto    = "http"
+    port     = 8080
+  }
+}
+
+access_enabled = true
+access_emails  = ["seu@email.com"]
+```
+
+Depois execute novamente para aplicar:
+
+```bash
+sudo bash scripts/cloudflare-tunnel/cloudflare-tunnel.sh
+```
+
+#### Comandos Terraform
+
+```bash
+cd scripts/cloudflare-tunnel/terraform
+terraform plan              # Ver mudanças
+terraform apply             # Aplicar
+terraform destroy           # Excluir tudo (túnel, DNS, Access)
+terraform output            # Ver URLs e IDs
+```
+
+#### Configurar clientes
 
 ##### HTTP/HTTPS — acesso direto pelo navegador:
 
@@ -274,12 +284,8 @@ https://app.seuhomelab.com.br
 ##### SSH — instalar `cloudflared` na máquina cliente:
 
 ```bash
-# Instalação (mesmo método do passo 6)
-curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg | \
-    sudo gpg --dearmor -o /usr/share/keyrings/cloudflare-main.gpg
-echo "deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared bookworm main" | \
-    sudo tee /etc/apt/sources.list.d/cloudflared.list
-sudo apt update && sudo apt install -y cloudflared
+# Instalação automatizada
+sudo bash scripts/cloudflare-tunnel/cloudflared-client.sh
 
 # Acesso:
 cloudflared access ssh --hostname ssh.seuhomelab.com.br
@@ -294,6 +300,13 @@ Host ssh.seuhomelab.com.br
 ```bash
 cloudflared access rdp --hostname rdp.seuhomelab.com.br --url localhost:3389
 # Conecte o cliente RDP em: localhost:3389
+```
+
+**Verificação:**
+
+```bash
+sudo journalctl -u cloudflared -n 20
+terraform -chdir=scripts/cloudflare-tunnel/terraform output
 ```
 
 ---
@@ -388,8 +401,15 @@ scripts/
 │   ├── dns-setup.sh             # Configurar domínio DNS
 │   └── README.md                # Guia detalhado do DNS
 └── cloudflare-tunnel/
-    ├── cloudflare-tunnel.sh     # Gerenciar túnel Cloudflare
-    └── README.md                # Guia detalhado do Túnel
+    ├── cloudflare-tunnel.sh            # Instalar + executar Terraform
+    ├── cloudflared-client.sh           # Instalar cloudflared no cliente
+    ├── terraform/
+    │   ├── providers.tf               # Provider Cloudflare
+    │   ├── variables.tf               # Variáveis
+    │   ├── main.tf                    # Resources (túnel, DNS, Access)
+    │   ├── outputs.tf                 # URLs e IDs
+    │   └── terraform.tfvars.example   # Exemplo de config
+    └── README.md                       # Guia detalhado do Túnel (Terraform)
 ```
 
 ---
@@ -398,13 +418,14 @@ scripts/
 
 | Sintoma                          | Causa provável                   | Solução                                                        |
 | -------------------------------- | --------------------------------- | ---------------------------------------------------------------- |
-| Tunnel DOWN                      | `ufw deny` nas portas           | `sudo ufw delete deny <porta>/tcp`                             |
-| SSH via túnel:`bad handshake` | DNS não proxied                  | `cloudflared tunnel route dns --overwrite-dns <tunel> ssh.xxx` |
+| Tunnel DOWN                      | `ufw deny` nas portas ou serviço parado | `sudo journalctl -u cloudflared -n 20`                     |
+| SSH via túnel:`bad handshake` | DNS não proxied ou serviço errado | `terraform -chdir=scripts/cloudflare-tunnel/terraform apply` |
+| `terraform apply` falha        | Token ou permissões erradas        | Verifique `TF_VAR_api_token` e Account ID                      |
 | `cloudflared access ssh` falha | Serviço escuta em`0.0.0.0`     | Configurar`ListenAddress 127.0.0.1` no sshd                    |
 | DNS não resolve                 | Serviço`bind9` off             | `sudo systemctl restart bind9`                                 |
 | Docker: permission denied        | Usuário não no grupo docker     | `sudo usermod -aG docker $USER` + re-login                     |
 | IP fixo não aplica              | NetworkManager conflitando        | Executar`ip-fixo.sh` novamente (detecta NM)                    |
-| Repositório cloudflared 404     | Debian 13 (trixie) não suportado | Script já usa fallback`bookworm`                              |
+| Acesso negado (403)              | Cloudflare Access bloqueando       | Verifique `access_emails` no `terraform.tfvars`                |
 
 ---
 
