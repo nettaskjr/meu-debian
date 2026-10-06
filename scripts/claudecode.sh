@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-appNome="Firefox-esr"
+appNome="Claude"
 appNomeLower=$(echo "$appNome" | tr '[:upper:]' '[:lower:]')
 
 echo "=== ➡️ Instalando $appNome ==="
@@ -11,7 +11,18 @@ sudo apt update -y
 sudo apt upgrade -y
 
 echo "=== ➡️ Instalando $appNome ==="
-sudo apt install -y $appNomeLower
+curl -fsSL https://claude.ai/install.sh | bash
+
+echo
+echo "=== ➡️ FreeLLM API ==="
+read -rp "Deseja instalar o FreeLLM API? (s/N): " instalar_freellm
+if [[ "$instalar_freellm" =~ ^[Ss]$ ]]; then
+  curl -fsSL https://freellmapi.co/install.sh | bash
+
+  echo
+  read -rp "Informe a API key para cadastrar no Claude Code: " api_key
+  npx freellmapi setup-claude --url http://localhost:3001 --api-key "$api_key"
+fi
 
 echo
 echo "=============================================="

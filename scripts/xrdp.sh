@@ -4,7 +4,7 @@ set -e
 appNome="xRDP (Remote Desktop)"
 
 echo "=============================================="
-echo "  🔧 Instalacao de $appNome"
+echo "  🔧 instalação de $appNome"
 echo "=============================================="
 echo
 
