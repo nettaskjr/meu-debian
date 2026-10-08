@@ -36,6 +36,8 @@ if [[ "$instalar_freellm" =~ ^[Ss]$ ]]; then
 
   echo "=== ➡️ Configurando o Claude Code ==="
   npx freellmapi setup-claude --url http://localhost:3001 --api-key "$api_key"
+
+  echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc && source ~/.bashrc
 fi
 
 echo

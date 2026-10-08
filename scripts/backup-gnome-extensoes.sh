@@ -176,8 +176,9 @@ menu() {
 main() {
     if [ ! -d "$DIR_EXTENSOES" ]; then
         echo "❌ Diretório de extensões não encontrado: $DIR_EXTENSOES"
-        exit 1
-    fi
+        echo "Criando diretório: $DIR_EXTENSOES"
+        mkdir "$DIR_EXTENSOES" 
+    fi 
 
     menu
 
