@@ -31,6 +31,13 @@ CONFIGURACOES=(
     "org.gnome.desktop.privacy" "usb-protection" "false"
     "org.gnome.desktop.peripherals.keyboard" "repeat" "true"
     "org.gnome.desktop.peripherals.mouse" "natural-scroll" "false"
+    "org.gnome.gedit.preferences.editor" "display-right-margin" "true"
+    "org.gnome.gedit.preferences.editor" "right-margin-position" "80"
+    "org.gnome.gedit.preferences.editor" "insert-spaces" "true"
+    "org.gnome.gedit.plugins" "active-plugins" "['docinfo', 'filebrowser', 'modelines', 'sort', 'spell', 'time', 'quickhighlight']"
+    # atalhos de teclado customizados (pré-definidos)
+    "org.gnome.settings-daemon.plugins.media-keys" "www" "['<Super>w']"
+    "org.gnome.settings-daemon.plugins.media-keys" "home" "['<Super>e']"
 )
 
 # ------------------------------------------------------------
@@ -44,9 +51,8 @@ CONFIGURACOES=(
 #   "<Control><Alt>t" "gnome-terminal" "Terminal" "Abrir terminal"
 # ------------------------------------------------------------
 ATALHOS=(
-    "<Super>e" "nautilus" "Pasta Home" "Abrir pasta home"
     "<Control><Alt>t" "gnome-terminal" "Terminal" "Abrir terminal"
-    "<Super>w" "x-www-browser" "Navegador" "Abrir navegador padrão"
+    "<Super>g" "gedit" "Editor de Texto" "Abrir editor de texto"
 )
 
 # ------------------------------------------------------------
