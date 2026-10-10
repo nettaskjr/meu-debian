@@ -148,9 +148,47 @@ aplicar_atalhos() {
     echo "=============================================="
 }
 
+aplicar_configuracoes_terminal() {
+    echo
+    echo "=== ➡️ Configurando cores do terminal (Verde no Preto) ==="
+
+    if ! command -v dconf &>/dev/null; then
+        echo "⚠️  Comando 'dconf' não encontrado."
+        return
+    fi
+
+    # 1. Pega o UUID do perfil padrão atual (remover aspas se houver)
+    local perfil_id
+    perfil_id=$(dconf read /org/gnome/terminal/legacy/profiles:/default 2>/dev/null | tr -d "'")
+
+    # Se a chave 'default' estiver vazia, tenta extrair o primeiro UUID da lista
+    if [ -z "$perfil_id" ]; then
+        perfil_id=$(dconf read /org/gnome/terminal/legacy/profiles:/list 2>/dev/null | grep -o -E "[a-f0-9-]{36}" | head -n 1)
+    fi
+
+    if [ -z "$perfil_id" ]; then
+        echo "⚠️  Não foi possível identificar o perfil atual do terminal."
+        return
+    fi
+
+    echo "   Perfil encontrado: $perfil_id"
+    local base_path="/org/gnome/terminal/legacy/profiles:/$perfil_id/"
+
+    # 2. Configura as cores e desativa as cores do tema
+    dconf write "${base_path}use-theme-colors" "false" 2>/dev/null
+    dconf write "${base_path}background-color" "'#000000'" 2>/dev/null
+    dconf write "${base_path}foreground-color" "'#00ff00'" 2>/dev/null
+
+    # Opcional: define um nome legível para o perfil
+    dconf write "${base_path}visible-name" "'Verde no Preto'" 2>/dev/null
+
+    echo "   ✅ Cores 'verde no preto' aplicadas com sucesso no perfil!"
+}
+
 main() {
     aplicar_configuracoes
     aplicar_atalhos
+    aplicar_configuracoes_terminal
 
     echo
     echo "ℹ️  Algumas alterações podem exigir reiniciar a sessão para surtir efeito."
