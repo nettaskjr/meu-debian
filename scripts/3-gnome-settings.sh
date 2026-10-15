@@ -20,6 +20,7 @@ CONFIGURACOES=(
     # "schema" "chave" "valor"
     "org.gnome.desktop.interface" "color-scheme" "'prefer-dark'"
     "org.gnome.desktop.interface" "clock-show-seconds" "true"
+    "org.gnome.desktop.interface" "clock-show-weekday" "true"
     "org.gnome.desktop.interface" "enable-animations" "false"
     "org.gnome.desktop.wm.preferences" "button-layout" "'appmenu:minimize,close'"
     "org.gnome.desktop.wm.preferences" "auto-raise" "false"
