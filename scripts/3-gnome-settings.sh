@@ -149,6 +149,23 @@ aplicar_atalhos() {
     echo "=============================================="
 }
 
+aplicar_apps_padrao() {
+    echo
+    echo "=== ➡️ Definindo aplicativos padrão ==="
+
+    if ! command -v xdg-mime &>/dev/null; then
+        echo "⚠️  Comando 'xdg-mime' não encontrado."
+        return
+    fi
+
+    echo "➡️ Arquivos .txt (text/plain) → gedit"
+    if xdg-mime default org.gnome.gedit.desktop text/plain 2>/dev/null; then
+        echo "   ✅ gedit definido como padrão para text/plain"
+    else
+        echo "   ❌ Falha ao definir gedit como padrão"
+    fi
+}
+
 aplicar_configuracoes_terminal() {
     echo
     echo "=== ➡️ Configurando cores do terminal (Verde no Preto) ==="
@@ -189,6 +206,7 @@ aplicar_configuracoes_terminal() {
 main() {
     aplicar_configuracoes
     aplicar_atalhos
+    aplicar_apps_padrao
     aplicar_configuracoes_terminal
 
     echo
