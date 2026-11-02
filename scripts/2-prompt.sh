@@ -4,6 +4,10 @@ set -e
 appNome="Prompt Personalizado"
 appNomeLower=$(echo "$appNome" | tr '[:upper:]' '[:lower:]')
 
+echo "=== ➡️ Instalando lsb-release ==="
+sudo apt-get update
+sudo apt-get install -y lsb-release
+
 echo "=== ➡️ Instalando $appNome ==="
 
 PROMPT_MARKER="# === Prompt Personalizado - meu-debian ==="

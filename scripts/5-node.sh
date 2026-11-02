@@ -12,7 +12,7 @@ sudo apt upgrade -y
 
 echo "=== ➡️ Instalando $appNome ==="
 curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo bash -
-sudo apt install -y $appNomeLower
+sudo apt install -y $appNomeLower npm
 
 echo
 echo "=============================================="

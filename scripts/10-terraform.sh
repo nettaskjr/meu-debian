@@ -6,6 +6,7 @@ echo "=== ➡️ Instalando Terraform ==="
 echo "=== ➡️ Atualizando o sistema ==="
 sudo apt update -y
 sudo apt upgrade -y
+sudo apt install gpg -y
 
 echo "=== ➡️ Instalando Terraform ==="
 curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
