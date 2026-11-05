@@ -3,6 +3,13 @@ set -e
 
 appNome="Configurações GNOME (gsettings)"
 
+# Botão lateral "avançar" do mouse -> <Ctrl>+<F4> (fecha a aba) via input-remapper.
+# Consulte o nome do dispositivo com: input-remapper-control --list-devices
+MOUSE_DEVICE="HREBOS-299 Mouse"        # nome do mouse
+MOUSE_FORWARD_BUTTON="BTN_EXTRA"       # botão 9 (avançar). Use "BTN_SIDE" para o "voltar"
+MOUSE_FORWARD_MACRO="KEY_LEFTCTRL+F4"  # atalho emitido (Ctrl+F4)
+MOUSE_PRESET="FecharAbas"              # nome do preset salvo
+
 echo "=== ➡️ Aplicando $appNome ==="
 
 # ============================================================
@@ -149,6 +156,61 @@ aplicar_atalhos() {
     echo "=============================================="
 }
 
+aplicar_botao_mouse() {
+    echo
+    echo "=== ➡️ Configurando botão 'avançar' do mouse → <Ctrl>+<F4> ==="
+
+    if ! command -v input-remapper-control &>/dev/null; then
+        echo "⚠️  input-remapper não encontrado. Instale com: sudo apt install input-remapper"
+        return
+    fi
+
+    if ! python3 - "$MOUSE_DEVICE" "$MOUSE_PRESET" "$MOUSE_FORWARD_BUTTON" "$MOUSE_FORWARD_MACRO" <<'PY'
+import sys
+from evdev import ecodes
+from inputremapper.configs.paths import PathUtils
+from inputremapper.configs.preset import Preset
+from inputremapper.configs.mapping import Mapping
+from inputremapper.configs.input_config import InputCombination, InputConfig
+from inputremapper.configs.global_config import GlobalConfig
+
+device, preset_name, button, macro = sys.argv[1:5]
+
+code = getattr(ecodes, button, None)
+if code is None:
+    print(f'Botão inválido: {button}', file=sys.stderr)
+    sys.exit(1)
+
+caminho = PathUtils.get_preset_path(device, preset_name)
+preset = Preset(caminho)
+preset.empty()
+preset.add(Mapping(
+    input_combination=InputCombination([InputConfig(type=ecodes.EV_KEY, code=code)]),
+    target_uinput="keyboard",
+    output_symbol=macro,
+    name="Fechar aba (Botão Avançar)",
+))
+preset.save()
+
+config = GlobalConfig()
+config.load_config()
+config.set_autoload_preset(device, preset_name)
+
+print(f"   ✅ Preset salvo em {caminho}")
+print(f"   ✅ Autoload registrado para '{device}'")
+PY
+    then
+        echo "   ❌ Falha ao configurar o botão do mouse"
+        return
+    fi
+
+    if input-remapper-control --command autoload 2>/dev/null; then
+        echo "   ✅ Preset aplicado"
+    else
+        echo "   ⚠️  Reinicie a sessão ou rode: sudo systemctl restart input-remapper-daemon.service"
+    fi
+}
+
 aplicar_apps_padrao() {
     echo
     echo "=== ➡️ Definindo aplicativos padrão ==="
@@ -206,6 +268,7 @@ aplicar_configuracoes_terminal() {
 main() {
     aplicar_configuracoes
     aplicar_atalhos
+    aplicar_botao_mouse
     aplicar_apps_padrao
     aplicar_configuracoes_terminal
 
