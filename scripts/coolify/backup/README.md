@@ -46,15 +46,26 @@ sudo apt install -y awscli openssl util-linux
 
 ## Instalacao
 
+O instalador cria o script, a configuracao, a passphrase, o cron e o logrotate:
+
 ```bash
-# 1. Script
-sudo install -m 700 scripts/coolify/backup-instancia.sh /usr/local/bin/coolify-backup.sh
+sudo ./scripts/coolify/backup/instala-backup-instancia.sh
+```
 
-# 2. Configuracao
-sudo install -m 600 scripts/coolify/coolify-backup.env.example /etc/coolify-backup.env
-sudo editor /etc/coolify-backup.env
+Ele pergunta os dados do R2 que estiverem faltando. Para nao perguntar nada:
 
-# 3. Passphrase (guarde tambem no gerenciador de senhas)
+```bash
+sudo ./scripts/coolify/backup/instala-backup-instancia.sh -y
+```
+
+Outras opcoes: `--help` (`--test`, `--skip-deps`, `--no-cron`, `--no-logrotate`,
+`--schedule`, `--config`, `--dest`, `--force`).
+
+Passos equivalentes, caso prefira instalar manualmente:
+
+```bash
+sudo install -m 700 scripts/coolify/backup/backup-instancia.sh /usr/local/bin/coolify-backup.sh
+sudo install -m 600 scripts/coolify/backup/coolify-backup.env.example /etc/coolify-backup.env
 openssl rand -base64 48 | sudo tee /etc/coolify-backup.passphrase >/dev/null
 sudo chmod 600 /etc/coolify-backup.passphrase
 ```
@@ -69,15 +80,15 @@ AWS_ACCESS_KEY_ID="..."
 AWS_SECRET_ACCESS_KEY="..."
 ```
 
-O host do endpoint e `<ACCOUNT_ID>.r2.cloudflarestorage.com`, sem `https://`
-nesse campo (o script monta a URL completa).
+O endpoint inclui o esquema, no formato
+`https://<ACCOUNT_ID>.r2.cloudflarestorage.com` (o script usa o valor como esta).
 
 > Sem a passphrase nao existe restore. Se ela for perdida, os backups antigos
 > continuam no R2, mas nao podem ser descriptografados.
 
 ### Cron
 
-Crie `/etc/cron.d/coolify-backup`:
+O instalador ja cria `/etc/cron.d/coolify-backup`. Para criar manualmente:
 
 ```cron
 30 3 * * * root flock -n /var/lock/coolify-backup.lock /usr/local/bin/coolify-backup.sh >> /var/log/coolify-backup.log 2>&1
@@ -91,17 +102,44 @@ sudo chmod 644 /etc/cron.d/coolify-backup
 
 ### Rotacao do log
 
-Crie `/etc/logrotate.d/coolify-backup`:
+O cron usa `>> /var/log/coolify-backup.log`: cada execucao acrescenta a saida ao
+mesmo arquivo. Sem rotacao o arquivo cresce indefinidamente e pode encher o
+disco. O `logrotate` (ja incluso no Debian) resolve isso: periodicamente ele
+renomeia o log atual, cria um novo vazio e comprime os antigos.
+
+O instalador cria `/etc/logrotate.d/coolify-backup` automaticamente. Para criar
+manualmente, use:
 
 ```
 /var/log/coolify-backup.log {
-    weekly
-    rotate 8
-    compress
-    missingok
-    notifempty
+    weekly               # rotaciona apos ~7 dias
+    rotate 8             # mantem 8 arquivos antigos (~8 semanas)
+    compress             # comprime os antigos (.gz)
+    missingok            # nao falha se o log nao existir
+    notifempty           # ignora arquivo vazio
+    create 0640 root adm # recria o log com essas permissoes
 }
 ```
+
+Resultado em `/var/log`:
+
+```
+coolify-backup.log        # atual
+coolify-backup.log.1.gz   # rotacao anterior
+...
+coolify-backup.log.8.gz   # mais antiga mantida
+```
+
+O `logrotate.timer` do systemd dispara o logrotate diariamente; o `weekly` e
+avaliado a cada disparo. Para conferir sem alterar nada e para forcar um teste:
+
+```bash
+sudo logrotate -d /etc/logrotate.d/coolify-backup
+sudo logrotate -f /etc/logrotate.d/coolify-backup
+```
+
+Como o cron abre e fecha o arquivo a cada execucao, nao e necessario
+`copytruncate` (usado apenas quando um processo mantem o arquivo aberto).
 
 ### Retencao no R2
 
