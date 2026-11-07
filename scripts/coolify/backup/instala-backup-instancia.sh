@@ -27,9 +27,11 @@ erro() { printf '%b%s%b\n' "$COR_VERMELHA" "$*" "$COR_RESET" >&2; }
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BACKUP_SRC="$SCRIPT_DIR/backup-instancia.sh"
+RESTORE_SRC="$SCRIPT_DIR/restore-instancia.sh"
 ENV_EXAMPLE="$SCRIPT_DIR/coolify-backup.env.example"
 
 DEST_SCRIPT="/usr/local/bin/coolify-backup.sh"
+DEST_RESTORE="/usr/local/bin/coolify-restore.sh"
 CONFIG_FILE="/etc/coolify-backup.env"
 PASSPHRASE_FILE="/etc/coolify-backup.passphrase"
 CRON_FILE="/etc/cron.d/coolify-backup"
@@ -58,6 +60,7 @@ Instala o backup do plano de controle do Coolify para Cloudflare R2.
 
 O que é instalado:
   /usr/local/bin/coolify-backup.sh     script de backup
+  /usr/local/bin/coolify-restore.sh    script de restauração
   /etc/coolify-backup.env              configuração do R2 (modo 600)
   /etc/coolify-backup.passphrase       chave de criptografia (modo 600)
   /etc/cron.d/coolify-backup           execução diária com flock
@@ -165,6 +168,10 @@ check_environment() {
     exit 1
   fi
 
+  if [[ ! -f "$RESTORE_SRC" ]]; then
+    warn "Script de restauração não encontrado: $RESTORE_SRC (será ignorado)."
+  fi
+
   if [[ "$(docker inspect -f '{{.State.Running}}' coolify-db 2>/dev/null || true)" != "true" ]]; then
     warn "O container coolify-db não está rodando; o backup só funcionará depois que o Coolify subir."
   else
@@ -241,6 +248,16 @@ install_backup_script() {
   mkdir -p "$(dirname "$DEST_SCRIPT")"
   install -m 700 "$BACKUP_SRC" "$DEST_SCRIPT"
   ok "Script instalado: $DEST_SCRIPT"
+}
+
+install_restore_script() {
+  if [[ ! -f "$RESTORE_SRC" ]]; then
+    warn "Script de restauração ausente; instale-o manualmente em $DEST_RESTORE."
+    return 0
+  fi
+  mkdir -p "$(dirname "$DEST_RESTORE")"
+  install -m 700 "$RESTORE_SRC" "$DEST_RESTORE"
+  ok "Script de restauração instalado: $DEST_RESTORE"
 }
 
 install_config() {
@@ -415,6 +432,9 @@ print_summary() {
   printf '\n'
   ok "=== Instalação concluída ==="
   printf '  Script:     %s\n' "$DEST_SCRIPT"
+  if [[ -f "$DEST_RESTORE" ]]; then
+    printf '  Restore:    %s\n' "$DEST_RESTORE"
+  fi
   printf '  Config:     %s\n' "$CONFIG_FILE"
   printf '  Passphrase: %s\n' "$PASSPHRASE_FILE"
   printf '  Cron:       %s (%s)\n' "$CRON_FILE" "$CRON_SCHEDULE"
@@ -424,6 +444,7 @@ print_summary() {
   printf '  Log:        %s\n' "$LOG_FILE"
   printf '\n'
   info "Teste manual: sudo flock -n $LOCK_FILE $DEST_SCRIPT"
+  info "Restaurar:    sudo $DEST_RESTORE --help"
   info "Acompanhar:   sudo tail -f $LOG_FILE"
   if (( INSTALL_LOGROTATE )); then
     info "Rotação:      sudo logrotate -d $LOGROTATE_FILE (simulação)"
@@ -456,6 +477,7 @@ main() {
   fi
 
   install_backup_script
+  install_restore_script
   install_config
   install_passphrase
   create_log_file

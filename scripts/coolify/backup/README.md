@@ -46,7 +46,8 @@ sudo apt install -y awscli openssl util-linux
 
 ## Instalacao
 
-O instalador cria o script, a configuracao, a passphrase, o cron e o logrotate:
+O instalador cria o script de backup, o de restauracao, a configuracao, a
+passphrase, o cron e o logrotate:
 
 ```bash
 sudo ./scripts/coolify/backup/instala-backup-instancia.sh
@@ -65,6 +66,7 @@ Passos equivalentes, caso prefira instalar manualmente:
 
 ```bash
 sudo install -m 700 scripts/coolify/backup/backup-instancia.sh /usr/local/bin/coolify-backup.sh
+sudo install -m 700 scripts/coolify/backup/restore-instancia.sh /usr/local/bin/coolify-restore.sh
 sudo install -m 600 scripts/coolify/backup/coolify-backup.env.example /etc/coolify-backup.env
 openssl rand -base64 48 | sudo tee /etc/coolify-backup.passphrase >/dev/null
 sudo chmod 600 /etc/coolify-backup.passphrase
@@ -189,6 +191,29 @@ uma instancia descartavel antes de considerar o backup confiavel.
 ---
 
 ## Restauracao
+
+O `restore-instancia.sh` automatiza os passos 2 a 5 deste guia (baixar/conferir,
+descriptografar, restaurar banco e arquivos e subir os containers):
+
+```bash
+# mesma maquina
+sudo ./scripts/coolify/backup/restore-instancia.sh --download
+
+# maquina nova (nao sobrescreve source/.env; copia apenas o APP_KEY)
+sudo ./scripts/coolify/backup/restore-instancia.sh --download --mode new
+```
+
+Tambem aceita `--file ARQUIVO.tar.enc` para um pacote local e `--r2-key CHAVE`
+para escolher um backup especifico. Veja `--help` para todas as opcoes
+(`--no-start`, `--keep`, `--skip-verify`, `--yes`, `--work-dir`,
+`--passphrase-file`).
+
+O instalador copia o restore para `/usr/local/bin/coolify-restore.sh`, entao
+tambem funciona como `sudo coolify-restore.sh --download`.
+
+O script valida o dump com `pg_restore --list` antes de alterar o banco e exige a
+confirmacao `RESTAURAR`. Os passos manuais abaixo continuam validos para
+conferencia ou restauracao parcial.
 
 ### 1. Preparar o destino
 
