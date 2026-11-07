@@ -435,26 +435,58 @@ restore_files_new() {
   ok "Arquivos restaurados (source/.env preservado)."
 }
 
+wait_for_coolify() {
+  local i health=""
+  info "Aguardando o container coolify ficar saudável..."
+  for ((i = 0; i < 30; i++)); do
+    health="$(docker inspect --format '{{.State.Health.Status}}' coolify 2>/dev/null || true)"
+    if [[ "$health" == "healthy" ]]; then
+      ok "coolify está saudável."
+      return 0
+    fi
+    sleep 2
+  done
+  warn "coolify não ficou saudável em 60s (status: ${health:-desconhecido})."
+  warn "Confira: docker logs coolify"
+  return 0
+}
+
 start_panel() {
   if (( ! START )); then
     warn "Containers não iniciados (--no-start)."
     return 0
   fi
 
-  info "Subindo containers..."
-  if (cd "$DATA_DIR/source" && docker compose up -d); then
+  # O docker-compose.yml base nao define imagem para o servico coolify;
+  # a imagem vem do docker-compose.prod.yml. Sem os dois, o compose falha com
+  # "service coolify has neither an image nor a build context specified".
+  local -a args=(--env-file "$ENV_FILE" -f "$DATA_DIR/source/docker-compose.yml")
+  if [[ -f "$DATA_DIR/source/docker-compose.prod.yml" ]]; then
+    args+=(-f "$DATA_DIR/source/docker-compose.prod.yml")
+  fi
+  if [[ -f "$DATA_DIR/source/docker-compose.custom.yml" ]]; then
+    args+=(-f "$DATA_DIR/source/docker-compose.custom.yml")
+  fi
+  if [[ -f "$DATA_DIR/source/docker-compose.postgres-upgrade.yml" ]]; then
+    args+=(-f "$DATA_DIR/source/docker-compose.postgres-upgrade.yml")
+  fi
+
+  info "Subindo containers (docker-compose.yml + docker-compose.prod.yml)..."
+  if (cd "$DATA_DIR/source" && docker compose "${args[@]}" up -d --remove-orphans); then
     ok "Containers iniciados."
+    wait_for_coolify
     return 0
   fi
 
   if command -v docker-compose >/dev/null 2>&1 && \
-     (cd "$DATA_DIR/source" && docker-compose up -d); then
+     (cd "$DATA_DIR/source" && docker-compose "${args[@]}" up -d --remove-orphans); then
     ok "Containers iniciados (docker-compose)."
+    wait_for_coolify
     return 0
   fi
 
   erro "Falha ao subir os containers."
-  erro "Rode manualmente: cd $DATA_DIR/source && docker compose up -d"
+  erro "Rode manualmente: cd $DATA_DIR/source && docker compose --env-file .env -f docker-compose.yml -f docker-compose.prod.yml up -d --remove-orphans"
   return 1
 }
 

@@ -287,8 +287,15 @@ Mantenha `DB_PASSWORD` e `REDIS_PASSWORD` da instalacao nova.
 
 ```bash
 cd /data/coolify/source
-docker compose up -d
+docker compose --env-file .env \
+  -f docker-compose.yml -f docker-compose.prod.yml \
+  up -d --remove-orphans
 ```
+
+Se existir `docker-compose.custom.yml`, inclua tambem
+`-f docker-compose.custom.yml`. Rodar so `docker compose up -d` falha com
+`service "coolify" has neither an image nor a build context specified`, porque a
+imagem do servico `coolify` esta no `docker-compose.prod.yml`.
 
 Faca login, confira os recursos e rode um deploy de teste.
 
