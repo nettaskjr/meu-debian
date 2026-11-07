@@ -372,6 +372,60 @@ restore_database() {
   ok "Banco restaurado."
 }
 
+fix_ssh_authorized_keys() {
+  local dir="$DATA_DIR/ssh/keys"
+  local auth="/root/.ssh/authorized_keys"
+  local key pub alvo added=0
+
+  if [[ ! -d "$dir" ]]; then
+    warn "Diretório de chaves SSH não encontrado: $dir"
+    return 0
+  fi
+
+  if ! command -v ssh-keygen >/dev/null 2>&1; then
+    warn "ssh-keygen não encontrado; não foi possível autorizar as chaves SSH."
+    warn "Adicione manualmente a chave pública em $auth."
+    return 0
+  fi
+
+  mkdir -p /root/.ssh
+  chmod 700 /root/.ssh
+  touch "$auth"
+  chmod 600 "$auth"
+
+  # Coolify acessa o host como root@host.docker.internal usando estas chaves.
+  for key in "$dir"/id.*; do
+    [[ -f "$key" ]] || continue
+    case "$key" in *.pub) continue ;; esac
+
+    pub="$(ssh-keygen -y -f "$key" </dev/null 2>/dev/null || true)"
+    if [[ -z "$pub" ]]; then
+      warn "Não foi possível obter a chave pública de $(basename "$key")."
+      continue
+    fi
+
+    alvo="$(printf '%s' "$pub" | awk '{print $1" "$2}')"
+    if awk '{print $1" "$2}' "$auth" 2>/dev/null | grep -Fxq "$alvo"; then
+      ok "Chave SSH já autorizada: $(basename "$key")"
+    else
+      printf '%s\n' "$pub" >> "$auth"
+      ok "Chave SSH autorizada: $(basename "$key")"
+      added=1
+    fi
+  done
+
+  chmod 600 "$auth"
+  chown root:root "$auth" 2>/dev/null || true
+
+  # Mantém as permissões que o instalador do Coolify usa.
+  chown -R 9999:root "$DATA_DIR/ssh" 2>/dev/null || true
+  chmod -R 700 "$DATA_DIR/ssh" 2>/dev/null || true
+
+  if (( added )); then
+    info "Teste com: ssh -i $dir/id.root@host.docker.internal root@127.0.0.1 true"
+  fi
+}
+
 patch_app_key() {
   local origem="$WORK/files/coolify/source/.env"
   local destino="$ENV_FILE"
@@ -558,6 +612,8 @@ main() {
   else
     restore_files_new
   fi
+
+  fix_ssh_authorized_keys
 
   if ! start_panel; then
     start_failed=1

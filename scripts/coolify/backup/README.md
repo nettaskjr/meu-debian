@@ -212,8 +212,12 @@ O instalador copia o restore para `/usr/local/bin/coolify-restore.sh`, entao
 tambem funciona como `sudo coolify-restore.sh --download`.
 
 O script valida o dump com `pg_restore --list` antes de alterar o banco e exige a
-confirmacao `RESTAURAR`. Os passos manuais abaixo continuam validos para
-conferencia ou restauracao parcial.
+confirmacao `RESTAURAR`. Ele tambem reautoriza em `/root/.ssh/authorized_keys` as
+chaves restauradas de `/data/coolify/ssh/keys`, necessarias para o Coolify
+acessar o host como `root@host.docker.internal`.
+
+Os passos manuais abaixo continuam validos para conferencia ou restauracao
+parcial.
 
 ### 1. Preparar o destino
 
@@ -314,6 +318,7 @@ Faca login, confira os recursos e rode um deploy de teste.
 | `bad decrypt` | Passphrase errada ou `-iter` diferente de `200000` |
 | Cron nao gera arquivo | Veja `/var/log/coolify-backup.log`; confira o `PATH` |
 | Backup nativo sumiu do R2 | Regra de lifecycle aplicada a prefixo errado |
+| `root@host.docker.internal: Permission denied (publickey)` | A chave restaurada não está em `/root/.ssh/authorized_keys`; rode o `restore-instancia.sh` de novo ou autorize a chave manualmente |
 
 ---
 
