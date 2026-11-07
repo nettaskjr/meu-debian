@@ -42,7 +42,7 @@ confirm() {
 
 collect_state() {
   if command -v docker >/dev/null 2>&1; then
-    printf 'CONTAINERS=%s\n' "$(docker ps -a --format '{{.Names}}' 2>/dev/null | grep -E '^(coolify|coolify-db|coolify-redis|coolify-realtime|coolify-sentinel|coolify-proxy)(_|$)' | paste -sd, - || true)"
+    printf 'CONTAINERS=%s\n' "$(docker ps -a --format '{{.Names}}' 2>/dev/null | grep -E '^(coolify-proxy-error-pages|coolify|coolify-db|coolify-redis|coolify-realtime|coolify-sentinel|coolify-proxy)(_|$)' | paste -sd, - || true)"
     printf 'VOLUMES=%s\n' "$(docker volume ls -q 2>/dev/null | grep -E '^(coolify-db|coolify-redis)$' | paste -sd, - || true)"
     printf 'NETWORK=%s\n' "$(docker network ls --format '{{.Name}}' 2>/dev/null | grep -x 'coolify' | paste -sd, - || true)"
     printf 'IMAGES=%s\n' "$(docker images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null | grep -E 'coollabsio' | paste -sd, - || true)"
@@ -64,7 +64,7 @@ collect_state() {
 
 remove_containers() {
   local c
-  for c in coolify coolify-db coolify-redis coolify-sentinel coolify-realtime; do
+  for c in coolify coolify-db coolify-redis coolify-sentinel coolify-realtime coolify-proxy-error-pages; do
     if [[ ",${CONTAINERS}," == *",${c},"* ]]; then
       docker rm -f "$c" >/dev/null 2>&1 || true
     fi

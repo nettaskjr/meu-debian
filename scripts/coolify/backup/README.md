@@ -1,0 +1,255 @@
+# Coolify — Backup do plano de controle para Cloudflare R2
+
+---
+
+## Visao geral
+
+O Coolify tem **backup nativo** para os bancos das aplicacoes (PostgreSQL, MySQL,
+MariaDB, MongoDB, ClickHouse e SQLite), com upload para qualquer storage
+S3-compativel, incluindo o R2. Use o backup nativo para os bancos gerenciados.
+
+O backup nativo **nao cobre** o plano de controle do Coolify:
+
+| Item | Onde fica | Coberto por este script |
+|---|---|---|
+| Banco interno do Coolify (projetos, apps, usuarios, settings) | volume Docker `coolify-db` | sim (`pg_dump`) |
+| `APP_KEY`, senhas e chaves SSH | `/data/coolify/source/.env` e `/data/coolify/ssh` | sim |
+| Configuracoes geradas de apps/bancos/servicos/proxy | `/data/coolify/*` | sim |
+| Dados das aplicacoes e bancos gerenciados | volumes Docker dos recursos | nao (use o backup nativo) |
+
+O `backup-instancia.sh` gera um unico pacote criptografado com:
+
+- `db.dmp` — `pg_dump --format=custom` do container `coolify-db`
+- `data.tar.gz` — `/data/coolify`, sem `backups`, logs e `ssh/mux`
+
+e envia `coolify-instancia-AAAAmmdd_HHMMSS.tar.enc` + `.sha256` para o R2.
+
+---
+
+## Pre-requisitos
+
+- [ ] Coolify instalado em `/data/coolify` e container `coolify-db` em execucao
+- [ ] Bucket no Cloudflare R2
+- [ ] Token R2 com permissao **Object Read & Write** no bucket
+- [ ] AWS CLI, OpenSSL, Docker e `flock` instalados
+- [ ] Acesso root (cron e leitura de `/data/coolify`)
+
+```bash
+sudo apt update
+sudo apt install -y awscli openssl util-linux
+```
+
+> O pacote `awscli` do Debian e suficiente. Se preferir o AWS CLI v2, instale
+> pelo instalador oficial da AWS.
+
+---
+
+## Instalacao
+
+```bash
+# 1. Script
+sudo install -m 700 scripts/coolify/backup-instancia.sh /usr/local/bin/coolify-backup.sh
+
+# 2. Configuracao
+sudo install -m 600 scripts/coolify/coolify-backup.env.example /etc/coolify-backup.env
+sudo editor /etc/coolify-backup.env
+
+# 3. Passphrase (guarde tambem no gerenciador de senhas)
+openssl rand -base64 48 | sudo tee /etc/coolify-backup.passphrase >/dev/null
+sudo chmod 600 /etc/coolify-backup.passphrase
+```
+
+Preencha em `/etc/coolify-backup.env`:
+
+```bash
+R2_BUCKET="coolify-backups"
+R2_ENDPOINT="https://<ACCOUNT_ID>.r2.cloudflarestorage.com"
+R2_PREFIX="instancia"
+AWS_ACCESS_KEY_ID="..."
+AWS_SECRET_ACCESS_KEY="..."
+```
+
+O host do endpoint e `<ACCOUNT_ID>.r2.cloudflarestorage.com`, sem `https://`
+nesse campo (o script monta a URL completa).
+
+> Sem a passphrase nao existe restore. Se ela for perdida, os backups antigos
+> continuam no R2, mas nao podem ser descriptografados.
+
+### Cron
+
+Crie `/etc/cron.d/coolify-backup`:
+
+```cron
+30 3 * * * root flock -n /var/lock/coolify-backup.lock /usr/local/bin/coolify-backup.sh >> /var/log/coolify-backup.log 2>&1
+```
+
+```bash
+sudo chmod 644 /etc/cron.d/coolify-backup
+```
+
+`flock -n` evita duas execucoes simultaneas (cron + execucao manual).
+
+### Rotacao do log
+
+Crie `/etc/logrotate.d/coolify-backup`:
+
+```
+/var/log/coolify-backup.log {
+    weekly
+    rotate 8
+    compress
+    missingok
+    notifempty
+}
+```
+
+### Retencao no R2
+
+A retencao fica no bucket, nao no script:
+
+1. Cloudflare Dashboard → R2 → bucket → **Settings → Object lifecycle rules**
+2. Adicione uma regra com prefixo `instancia/`
+3. Ex.: **Delete objects after 30 days**
+
+Antes de criar a regra, confira o prefixo usado pelo backup nativo do Coolify e
+nao aplique a regra a ele, para nao apagar copias que o Coolify ainda gerencia.
+
+---
+
+## Teste
+
+```bash
+sudo flock -n /var/lock/coolify-backup.lock /usr/local/bin/coolify-backup.sh
+```
+
+Confira no R2:
+
+- `instancia/coolify-instancia-*.tar.enc`
+- `instancia/coolify-instancia-*.tar.enc.sha256`
+
+Valide o pacote:
+
+```bash
+aws --region auto --endpoint-url "$R2_ENDPOINT" \
+  s3 cp "s3://$R2_BUCKET/instancia/ARQUIVO.tar.enc" .
+aws --region auto --endpoint-url "$R2_ENDPOINT" \
+  s3 cp "s3://$R2_BUCKET/instancia/ARQUIVO.tar.enc.sha256" .
+
+sha256sum -c ARQUIVO.tar.enc.sha256
+openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 \
+  -in ARQUIVO.tar.enc -out ARQUIVO.tar \
+  -pass file:/etc/coolify-backup.passphrase
+
+mkdir -p /tmp/coolify-restore
+tar -xf ARQUIVO.tar -C /tmp/coolify-restore
+docker exec -i coolify-db pg_restore --list < /tmp/coolify-restore/db.dmp | head
+```
+
+O `pg_restore --list` prova que o dump e valido. Faca tambem um restore real em
+uma instancia descartavel antes de considerar o backup confiavel.
+
+---
+
+## Restauracao
+
+### 1. Preparar o destino
+
+Instale o Coolify (de preferencia na mesma versao) e nao configure nada.
+Mantenha os containers no ar para o passo do banco.
+
+### 2. Baixar, conferir e descriptografar
+
+```bash
+aws --region auto --endpoint-url "$R2_ENDPOINT" \
+  s3 cp "s3://$R2_BUCKET/instancia/ARQUIVO.tar.enc" .
+aws --region auto --endpoint-url "$R2_ENDPOINT" \
+  s3 cp "s3://$R2_BUCKET/instancia/ARQUIVO.tar.enc.sha256" .
+
+sha256sum -c ARQUIVO.tar.enc.sha256
+openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 \
+  -in ARQUIVO.tar.enc -out ARQUIVO.tar \
+  -pass file:/etc/coolify-backup.passphrase
+
+mkdir -p /tmp/coolify-restore
+tar -xf ARQUIVO.tar -C /tmp/coolify-restore
+```
+
+### 3. Restaurar o banco interno
+
+Pare o painel e o Redis, mas **mantenha o `coolify-db` rodando**:
+
+```bash
+docker stop coolify coolify-redis
+
+DB_USER="$(docker exec coolify-db printenv POSTGRES_USER)"
+DB_NAME="$(docker exec coolify-db printenv POSTGRES_DB)"
+
+docker exec -i coolify-db pg_restore \
+  --clean --if-exists --exit-on-error --no-acl --no-owner \
+  --username="$DB_USER" --dbname="$DB_NAME" \
+  < /tmp/coolify-restore/db.dmp
+```
+
+### 4. Restaurar arquivos
+
+Extraia o tar de dados em um diretorio temporario:
+
+```bash
+sudo mkdir -p /tmp/coolify-files
+sudo tar -xzf /tmp/coolify-restore/data.tar.gz -C /tmp/coolify-files
+```
+
+**Mesma maquina:** copie por cima de `/data/coolify` e ajuste o dono:
+
+```bash
+sudo cp -a /tmp/coolify-files/coolify/. /data/coolify/
+sudo chown -R 9999:root /data/coolify
+```
+
+**Maquina nova:** nao sobrescreva o `/data/coolify/source` da instalacao nova.
+Copie apenas:
+
+```bash
+sudo cp -a /tmp/coolify-files/coolify/ssh/keys /data/coolify/ssh/
+sudo cp -a /tmp/coolify-files/coolify/applications /data/coolify/ 2>/dev/null || true
+sudo cp -a /tmp/coolify-files/coolify/databases /data/coolify/ 2>/dev/null || true
+sudo cp -a /tmp/coolify-files/coolify/services /data/coolify/ 2>/dev/null || true
+sudo chown -R 9999:root /data/coolify
+```
+
+E copie **somente o `APP_KEY`** do `.env` do backup para o `.env` atual.
+Mantenha `DB_PASSWORD` e `REDIS_PASSWORD` da instalacao nova.
+
+### 5. Subir e validar
+
+```bash
+cd /data/coolify/source
+docker compose up -d
+```
+
+Faca login, confira os recursos e rode um deploy de teste.
+
+---
+
+## Solucao de problemas
+
+| Sintoma | Causa provavel / solucao |
+|---|---|
+| `comando ausente: aws` | Instale o AWS CLI ou ajuste o `PATH` |
+| `403` no upload | Token sem `Object Read & Write` ou com escopo errado |
+| `SignatureDoesNotMatch` / erro de regiao | Confirme o endpoint e use `--region auto` |
+| `coolify-db nao esta rodando` | `docker start coolify-db` e rode de novo |
+| `dump vazio` | `POSTGRES_USER`/`POSTGRES_DB` ausentes no container |
+| `tamanho remoto difere do local` | Reenvie; verifique espaco e conectividade |
+| `bad decrypt` | Passphrase errada ou `-iter` diferente de `200000` |
+| Cron nao gera arquivo | Veja `/var/log/coolify-backup.log`; confira o `PATH` |
+| Backup nativo sumiu do R2 | Regra de lifecycle aplicada a prefixo errado |
+
+---
+
+## Relacao com `backup-coolify.sh`
+
+O `backup-coolify.sh` e a versao completa (fallback rclone/aws, retencao manual,
+mensagens). O `backup-instancia.sh` e a versao enxuta recomendada para cron.
+Os dois nao devem rodar juntos: escolha um e mantenha o outro apenas como
+referencia.
