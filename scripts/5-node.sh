@@ -9,10 +9,11 @@ echo "=== ➡️ Instalando $appNome ==="
 echo "=== ➡️ Atualizando o sistema ==="
 sudo apt update -y
 sudo apt upgrade -y
+apt install curl
 
 echo "=== ➡️ Instalando $appNome ==="
 curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo bash -
-sudo apt install -y $appNomeLower npm
+sudo apt install -y $appNomeLower
 
 echo
 echo "=============================================="
