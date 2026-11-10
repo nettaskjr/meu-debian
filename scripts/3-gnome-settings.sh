@@ -29,7 +29,7 @@ CONFIGURACOES=(
     "org.gnome.desktop.interface" "clock-show-seconds" "true"
     "org.gnome.desktop.interface" "clock-show-weekday" "true"
     "org.gnome.desktop.interface" "enable-animations" "false"
-    "org.gnome.desktop.wm.preferences" "button-layout" "'appmenu:minimize,close'"
+    "org.gnome.desktop.wm.preferences" "button-layout" "'appmenu:minimize,maximize,close'"
     "org.gnome.desktop.wm.preferences" "auto-raise" "false"
     "org.gnome.desktop.wm.preferences" "focus-mode" "'click'"
     "org.gnome.desktop.sound" "event-sounds" "false"
@@ -268,7 +268,7 @@ aplicar_configuracoes_terminal() {
 main() {
     aplicar_configuracoes
     aplicar_atalhos
-    aplicar_botao_mouse
+    #aplicar_botao_mouse
     aplicar_apps_padrao
     aplicar_configuracoes_terminal
 
