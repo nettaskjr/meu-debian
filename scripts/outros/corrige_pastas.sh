@@ -1,8 +1,8 @@
 #!/bin/bash
 
-#PASTA_ORIGEM= "/mnt/FILE_SERVER/Insync/nettask@hotmail.com/OneDrive/Modelos/" # DESKTOP
-PASTA_ORIGEM="/home/nestor/Insync/nettask@hotmail.com/OneDrive/" # NOTEBOOK
-PASTAS=("Documentos" "Imagens" "Modelos" "Músicas" "Público" "Vídeos" "Backups")
+PASTA_ORIGEM= "/mnt/FILE_SERVER/Insync/nestor.junior@gmail.com/Google Drive" # DESKTOP
+#PASTA_ORIGEM="/home/nestor/Insync/nestor.junior@gmail.com/Google Drive" # NOTEBOOK
+PASTAS=("AppImages" "Backups" "Documentos" "Downloads" "Imagens" "Modelos" "Músicas" "Público" "Vídeos")
 
 for pasta in "${PASTAS[@]}"; do
    DESTINO="$HOME/$pasta"
@@ -14,6 +14,8 @@ for pasta in "${PASTAS[@]}"; do
    	mv "$DESTINO" "$DESTINO.old"
    fi
    
+   echo "Criando link simbólico de $ORIGEM para $DESTINO"
+
    ln -s "$ORIGEM" "$DESTINO"
    
 done
