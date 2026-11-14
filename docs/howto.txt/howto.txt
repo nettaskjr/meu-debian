@@ -1,0 +1,10 @@
+1) caso o disco NTFS seja corrompido por queda de energia
+
+1.1) Confirmar a causa (deve aparecer algo como "Volume is dirty"):
+sudo dmesg | grep -i -E 'ntfs|sdb' | tail -20
+sudo mount -t ntfs3 /dev/sdb1 /mnt/GAMES
+
+1.2) Limpar o dirty bit e montar:
+sudo ntfsfix -d /dev/sdb1
+sudo mount /mnt/GAMES
+df -h /mnt/GAMES

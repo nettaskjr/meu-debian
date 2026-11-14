@@ -89,7 +89,17 @@ habilitar_repositorios_extras() {
         echo -e "${AMARELO}Adicionando 'contrib' e 'non-free' ao sources.list...${NC}"
         sed -i 's/main/main contrib non-free/g' /etc/apt/sources.list
     fi
+
+    # A arquitetura i386 é necessária para o Steam (steam-libs-i386)
+    if dpkg --print-foreign-architectures | grep -qx i386; then
+        echo -e "${VERDE}Arquitetura i386 já está habilitada.${NC}"
+    else
+        echo -e "${AMARELO}Habilitando arquitetura i386 (necessária para o Steam)...${NC}"
+        dpkg --add-architecture i386
+    fi
+
     echo -e "${AMARELO}Atualizando a lista de pacotes...${NC}"
+    apt update
     echo -e "${VERDE}Verificação de repositórios concluída e lista de pacotes atualizada.${NC}\n"
 }
 
